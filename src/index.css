@@ -2,61 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Updated to match the UI shown in the screenshots */
 
 @layer base {
   :root {
-    --background: 240 10% 3%;
-    --foreground: 0 0% 98%;
 
-    --card: 240 8% 8%;
+    /* ======== CORE PALETTE ======== */
+    --background: 240 8% 7%;          /* Deep warm black */
+    --foreground: 0 0% 98%;           /* Soft white */
+
+    --card: 240 6% 10%;               /* Slightly lighter black */
     --card-foreground: 0 0% 98%;
 
-    --popover: 240 8% 8%;
+    --popover: 240 6% 10%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 0 85% 60%;
-    --primary-foreground: 0 0% 100%;
-    
-    --primary-glow: 0 85% 70%;
+    /* Earthspace Brand Title → warm creamy highlight */
+    --primary: 45 50% 88%;            /* Warm beige highlight */
+    --primary-foreground: 0 0% 10%;
 
-    --secondary: 240 5% 15%;
+    /* Light warm glow outline */
+    --primary-glow: 45 70% 75%;
+
+    /* Headers / container outlines */
+    --secondary: 240 5% 18%;
     --secondary-foreground: 0 0% 98%;
 
-    --muted: 240 5% 15%;
-    --muted-foreground: 240 5% 60%;
+    /* Desaturated UI greys */
+    --muted: 240 4% 25%;
+    --muted-foreground: 240 5% 65%;
 
-    --accent: 0 85% 60%;
-    --accent-foreground: 0 0% 100%;
+    /* Accent button glow — similar to "Check in" button */
+    --accent: 45 50% 88%;
+    --accent-foreground: 0 0% 10%;
 
-    --destructive: 0 84.2% 60.2%;
+    /* Error color (not visible in screenshot, kept similar) */
+    --destructive: 0 75% 55%;
     --destructive-foreground: 0 0% 98%;
 
+    /* Borders + Inputs */
     --border: 240 5% 20%;
     --input: 240 5% 20%;
-    --ring: 0 85% 60%;
+    --ring: 45 50% 88%;
 
-    --radius: 0.75rem;
+    /* UI Radius (pill buttons in screenshot) */
+    --radius: 1.25rem;
 
-    /* Mars Space Custom Tokens */
-    --space-dark: 240 10% 3%;
-    --space-darker: 240 12% 5%;
-    --mars-red: 0 85% 60%;
-    --mars-orange: 15 90% 55%;
-    --stellar-white: 0 0% 98%;
-    
-    /* Gradients */
-    --gradient-cosmic: linear-gradient(135deg, hsl(240 10% 3%), hsl(240 8% 8%));
-    --gradient-mars: linear-gradient(135deg, hsl(0 85% 60%), hsl(15 90% 55%));
-    --gradient-hero: linear-gradient(180deg, hsl(240 10% 3%) 0%, hsl(0 85% 60% / 0.1) 100%);
-    
-    /* Shadows */
-    --shadow-glow: 0 0 40px lch(54.88% 76.93 31.49 / 0.3);
-    --shadow-card: 0 20px 40px hsl(240 10% 3% / 0.5);
-    
-    /* Transitions */
+    /* ======== CUSTOM EARTHSPACE TONES ======== */
+    --earthspace-warm-black: 240 8% 7%;
+    --earthspace-brown-black: 30 10% 10%;
+    --earthspace-beige: 45 50% 88%;
+    --earthspace-cream: 45 60% 92%;
+
+    /* ======== GRADIENTS (based on warm highlights) ======== */
+    --gradient-app-header: linear-gradient(
+      180deg,
+      hsl(240 8% 7%) 0%,
+      hsl(30 15% 12%) 100%
+    );
+
+    --gradient-highlight: linear-gradient(
+      135deg,
+      hsl(45 60% 92%),
+      hsl(45 45% 75%)
+    );
+
+    /* ======== SHADOWS ======== */
+    --shadow-glow: 0 0 28px hsl(45 80% 80% / 0.35);
+    --shadow-card: 0 20px 40px hsl(240 10% 3% / 0.45);
+
+    /* ======== TRANSITIONS ======== */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
