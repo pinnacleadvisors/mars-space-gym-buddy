@@ -53,7 +53,7 @@ All colors MUST be HSL.
     --gradient-hero: linear-gradient(180deg, hsl(240 10% 3%) 0%, hsl(0 85% 60% / 0.1) 100%);
     
     /* Shadows */
-    --shadow-glow: 0 0 40px hsl(0 85% 60% / 0.3);
+    --shadow-glow: 0 0 40px lch(54.88% 76.93 31.49 / 0.3);
     --shadow-card: 0 20px 40px hsl(240 10% 3% / 0.5);
     
     /* Transitions */
