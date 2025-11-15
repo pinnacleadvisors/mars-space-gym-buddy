@@ -74,8 +74,6 @@ export function AppSidebar() {
     { icon: BookOpen, label: "Bookings", path: "/bookings" },
     { icon: CreditCard, label: "Membership", path: "/managememberships" },
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-    { icon: QrCode, label: "QR Entry", path: "/qr/entry" },
-    { icon: QrCode, label: "QR Exit", path: "/qr/exit" }
   ];
 
   // 🧩 Admin-only menu (added if admin)
@@ -87,6 +85,11 @@ export function AppSidebar() {
     { icon: CreditCard, label: "Memberships", path: "/admin/memberships" },
     { icon: UserCog, label: "User Memberships", path: "/admin/usermemberships" },
   ];
+const quickActions = [
+    { icon: QrCode, label: "QR Entry", path: "/qr/entry" },
+    { icon: QrCode, label: "QR Exit", path: "/qr/exit" }
+  ];
+
 
   return (
     <Sidebar collapsible="icon" className="border-r">
