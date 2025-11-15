@@ -34,6 +34,56 @@ export default function ManageMemberships() {
 
   useEffect(() => {
     fetchData();
+    checkSubscriptionStatus();
+  }, []);
+
+  // Check subscription status on page load and after payment
+  const checkSubscriptionStatus = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data, error } = await supabase.functions.invoke("check-subscription", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error("Error checking subscription:", error);
+      } else if (data?.has_subscription) {
+        // Refresh data to show updated membership
+        await fetchData();
+      }
+    } catch (error) {
+      console.error("Error checking subscription:", error);
+    }
+  };
+
+  // Check for successful payment on return from Stripe
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("success") === "true") {
+      toast({
+        title: "Payment Successful!",
+        description: "Your membership has been activated.",
+      });
+      
+      // Check and update subscription status
+      checkSubscriptionStatus();
+      
+      // Clean URL
+      window.history.replaceState({}, "", "/managememberships");
+    } else if (params.get("canceled") === "true") {
+      toast({
+        variant: "destructive",
+        title: "Payment Cancelled",
+        description: "Your payment was cancelled. No charges were made.",
+      });
+      
+      // Clean URL
+      window.history.replaceState({}, "", "/managememberships");
+    }
   }, []);
 
   const fetchData = async () => {
@@ -77,38 +127,34 @@ export default function ManageMemberships() {
   };
 
   const handleRegister = async () => {
-    if (!membership) return;
     setActionLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
 
-      const startDate = new Date();
-      const endDate = new Date();
-      endDate.setDate(endDate.getDate() + membership.duration_days);
-
-      const { error } = await supabase.from("user_memberships").insert({
-        user_id: user.id,
-        membership_id: membership.id,
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString(),
-        status: "active",
-        payment_status: "paid",
+      // Create Stripe checkout session
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (error) throw error;
 
-      toast({
-        title: "Membership Registered",
-        description: "Your membership has been activated successfully.",
-      });
-
-      await fetchData();
+      if (data?.url) {
+        // Redirect to Stripe checkout
+        window.open(data.url, "_blank");
+        
+        toast({
+          title: "Redirecting to Payment",
+          description: "Opening Stripe checkout in a new tab...",
+        });
+      }
     } catch (error: any) {
       toast({
         variant: "destructive",
-        title: "Registration failed",
+        title: "Payment Setup Failed",
         description: error.message,
       });
     } finally {
@@ -121,16 +167,21 @@ export default function ManageMemberships() {
     setActionLoading(true);
 
     try {
-      const { error } = await supabase
-        .from("user_memberships")
-        .update({ status: "cancelled" })
-        .eq("id", userMembership.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      // Cancel subscription via Stripe
+      const { data, error } = await supabase.functions.invoke("cancel-subscription", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
       if (error) throw error;
 
       toast({
         title: "Membership Cancelled",
-        description: "Your membership has been cancelled.",
+        description: data?.message || "Your membership will be cancelled at the end of the billing period.",
       });
 
       await fetchData();
@@ -146,31 +197,29 @@ export default function ManageMemberships() {
   };
 
   const handleRenew = async () => {
-    if (!userMembership || !membership) return;
     setActionLoading(true);
 
     try {
-      const currentEndDate = new Date(userMembership.end_date);
-      const now = new Date();
-      const newEndDate = currentEndDate > now ? new Date(currentEndDate) : new Date(now);
-      newEndDate.setDate(newEndDate.getDate() + membership.duration_days);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
 
-      const { error } = await supabase
-        .from("user_memberships")
-        .update({
-          end_date: newEndDate.toISOString(),
-          status: "active",
-        })
-        .eq("id", userMembership.id);
+      // Create new Stripe checkout session for renewal
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
       if (error) throw error;
 
-      toast({
-        title: "Membership Renewed",
-        description: `Your membership has been extended until ${newEndDate.toLocaleDateString()}.`,
-      });
-
-      await fetchData();
+      if (data?.url) {
+        window.open(data.url, "_blank");
+        
+        toast({
+          title: "Redirecting to Payment",
+          description: "Opening Stripe checkout to renew your membership...",
+        });
+      }
     } catch (error: any) {
       toast({
         variant: "destructive",

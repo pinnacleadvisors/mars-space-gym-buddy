@@ -24,18 +24,27 @@ export function BottomNav() {
   // 🔐 Check if the logged-in user is an admin
   useEffect(() => {
     const checkAdminRole = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
+        if (!user) return;
+
+        const { data, error } = await supabase
+          .from("user_roles")
           .select("role")
-          .eq("id", user.id)
+          .eq("user_id", user.id)
           .single();
 
-        setIsAdmin(profile?.role === "admin");
+        if (error) {
+          console.error("Error fetching user role:", error);
+          return;
+        }
+
+        setIsAdmin(data?.role === "admin");
+      } catch (err) {
+        console.error("Role check failed:", err);
       }
     };
 

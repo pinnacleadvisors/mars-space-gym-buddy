@@ -74,6 +74,8 @@ export function AppSidebar() {
     { icon: BookOpen, label: "Bookings", path: "/bookings" },
     { icon: CreditCard, label: "Membership", path: "/managememberships" },
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+    { icon: QrCode, label: "QR Entry", path: "/qr/entry" },
+    { icon: QrCode, label: "QR Exit", path: "/qr/exit" }
   ];
 
   // 🧩 Admin-only menu (added if admin)
@@ -86,12 +88,6 @@ export function AppSidebar() {
     { icon: UserCog, label: "User Memberships", path: "/admin/usermemberships" },
   ];
 
-  // ⚡ Quick actions (always visible)
-  const quickActions = [
-    { icon: QrCode, label: "QR Entry", path: "/qr/entry" },
-    { icon: QrCode, label: "QR Exit", path: "/qr/exit" },
-  ];
-
   return (
     <Sidebar collapsible="icon" className="border-r">
       <SidebarContent>
@@ -99,7 +95,7 @@ export function AppSidebar() {
         <div className="flex items-center justify-between p-4">
           {open && (
             <h2 className="text-lg font-bold text-primary animate-fade-in">
-              GymFlow
+              marsspace
             </h2>
           )}
           <Button
