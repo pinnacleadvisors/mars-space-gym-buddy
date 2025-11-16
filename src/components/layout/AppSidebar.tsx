@@ -85,7 +85,7 @@ export function AppSidebar() {
     { icon: CreditCard, label: "Memberships", path: "/admin/memberships" },
     { icon: UserCog, label: "User Memberships", path: "/admin/usermemberships" },
   ];
-const quickActions = [
+  const quickActions = [
     { icon: QrCode, label: "QR Entry", path: "/qr/entry" },
     { icon: QrCode, label: "QR Exit", path: "/qr/exit" }
   ];
