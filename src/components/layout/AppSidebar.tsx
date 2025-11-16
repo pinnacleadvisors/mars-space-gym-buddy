@@ -89,8 +89,7 @@ const quickActions = [
     { icon: QrCode, label: "QR Entry", path: "/qr/entry" },
     { icon: QrCode, label: "QR Exit", path: "/qr/exit" }
   ];
-
-
+  
   return (
     <Sidebar collapsible="icon" className="border-r">
       <SidebarContent>
