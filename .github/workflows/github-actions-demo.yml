@@ -1,13 +1,13 @@
 name: Generate Supabase Types
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
-    paths:
-      - supabase/**
-      - .github/workflows/generate-types.yml
+
+permissions:
+  contents: write   # <-- REQUIRED so GitHub Actions can push changes
+  pull-requests: write
 
 jobs:
   gen-types:
@@ -16,42 +16,24 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
         with:
-          node-version: 20
+          token: ${{ secrets.GITHUB_TOKEN }}  # GitHub provides this automatically
+          fetch-depth: 0
 
-      - name: Install Supabase CLI (latest)
-        run: npm install -g supabase
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
-      - name: Verify Supabase CLI
-        run: supabase --version
-
-      - name: Create output directory
-        run: mkdir -p src/lib
-
-      - name: Generate database types
+      - name: Generate types
         run: |
-          npx supabase gen types typescript \
-            --project-id ${{ secrets.SUPABASE_PROJECT_ID }} \
-            --schema public > src/lib/database.types.ts
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          supabase gen types --project-id ${{ secrets.SUPABASE_PROJECT_ID }} > src/lib/types.ts
 
-      - name: Check for Git changes
+      - name: Commit and push changes
         run: |
-          if git diff --quiet; then
-            echo "No changes to commit"
-            exit 0
-          else
-            echo "Changes detected"
-          fi
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/lib/types.ts
 
-      - name: Commit changes
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add src/lib/database.types.ts
-          git commit -m "chore: update Supabase types"
-          git push
+          git commit -m "chore: regenerate Supabase types" || echo "No changes to commit"
+          git push origin HEAD:main
