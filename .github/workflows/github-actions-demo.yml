@@ -6,7 +6,7 @@ on:
       - main
 
 permissions:
-  contents: write   # <-- REQUIRED so GitHub Actions can push changes
+  contents: write
   pull-requests: write
 
 jobs:
@@ -17,19 +17,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}  # GitHub provides this automatically
           fetch-depth: 0
 
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:
           version: latest
-      
-      - name: Generate types
+
+      - name: Generate Supabase types
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           supabase gen types --project-id ${{ secrets.SUPABASE_PROJECT_ID }} > src/lib/types.ts
-      - env:
-        SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       - name: Commit changes
         run: |
           git config --global user.name "github-actions[bot]"
@@ -44,4 +44,3 @@ jobs:
       - name: Push changes
         run: |
           git push origin HEAD:main
-
