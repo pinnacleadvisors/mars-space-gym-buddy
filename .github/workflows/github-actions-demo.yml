@@ -1,46 +1,57 @@
 name: Generate Supabase Types
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
-  workflow_dispatch:
+    paths:
+      - supabase/**
+      - .github/workflows/generate-types.yml
 
 jobs:
-  generate-types:
+  gen-types:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout the repository
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      # 2️⃣ Setup Node.js 20 (required for Supabase CLI)
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # 3️⃣ Install dependencies (including Supabase CLI as dev dependency)
-      - name: Install npm dependencies
-        run: npm ci
+      - name: Install Supabase CLI (latest)
+        run: npm install -g supabase
 
-      # 4️⃣ Generate Supabase types using npx
+      - name: Verify Supabase CLI
+        run: supabase --version
+
+      - name: Create output directory
+        run: mkdir -p src/lib
+
       - name: Generate database types
+        run: |
+          npx supabase gen types typescript \
+            --project-id ${{ secrets.SUPABASE_PROJECT_ID }} \
+            --schema public > src/lib/database.types.ts
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
-        run: |
-          mkdir -p src/lib
-          npx supabase gen types typescript \
-            --project-id $SUPABASE_PROJECT_ID \
-            > src/lib/database.types.ts
 
-      # 5️⃣ Commit updated types if changed
-      - name: Commit generated types
+      - name: Check for Git changes
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          else
+            echo "Changes detected"
+          fi
+
+      - name: Commit changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
           git add src/lib/database.types.ts
-          git diff --cached --quiet || git commit -m "chore: regenerate Supabase types"
+          git commit -m "chore: update Supabase types"
           git push
