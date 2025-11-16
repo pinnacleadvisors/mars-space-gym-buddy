@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist",
-    "gen-types": "npx supabase gen types typescript --project-id <yggvabrltcxvkiyjixdv> > src/integrations/supabase/types.ts"
+    "gen:types": "npx supabase gen types typescript --project-id <yggvabrltcxvkiyjixdv> > src/integrations/supabase/types.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
