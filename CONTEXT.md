@@ -20,7 +20,7 @@ mars-space-gym-buddy/
 │   │   │   └── TopBar.tsx         # Top navigation bar
 │   │   └── ui/                    # shadcn/ui components (40+ components)
 │   ├── hooks/                     # Custom React hooks
-│   │   ├── useAuth.ts             # Authentication hook (TODO: implement)
+│   │   ├── useAuth.ts             # Authentication hook (✅ implemented)
 │   │   ├── useAdminAuth.ts        # Admin authentication hook
 │   │   ├── useBookings.ts         # Bookings hook (TODO: implement)
 │   │   ├── useAnalytics.ts        # Analytics hook (TODO: implement)
@@ -388,7 +388,7 @@ Defined in `src/index.css`:
 4. Check-out updates `check_out_time` and calculates duration
 
 ### Known TODOs
-- `useAuth.ts` - Authentication logic not implemented
+- ✅ `useAuth.ts` - Authentication logic implemented
 - `useBookings.ts` - Booking fetching not implemented
 - `useAnalytics.ts` - Analytics fetching not implemented
 
@@ -412,6 +412,23 @@ Defined in `src/index.css`:
 - Users can only access their own data unless admin
 
 ## 🔍 Code Patterns
+
+### Authentication with useAuth Hook
+```typescript
+import { useAuth } from "@/hooks/useAuth";
+
+const MyComponent = () => {
+  const { user, loading, login, logout, register, getUser } = useAuth();
+
+  // User is automatically fetched and updated on auth state changes
+  // Includes profile, role, and membership data
+  
+  if (loading) return <div>Loading...</div>;
+  if (!user) return <div>Please log in</div>;
+  
+  return <div>Welcome, {user.full_name}!</div>;
+};
+```
 
 ### Supabase Client Usage
 ```typescript
@@ -443,6 +460,12 @@ toast({
 
 ### Authentication Check
 ```typescript
+// Using useAuth hook (recommended)
+import { useAuth } from "@/hooks/useAuth";
+
+const { user, loading, login, logout, register } = useAuth();
+
+// Or direct Supabase check
 const { data: { user } } = await supabase.auth.getUser();
 if (!user) {
   // Handle unauthenticated
