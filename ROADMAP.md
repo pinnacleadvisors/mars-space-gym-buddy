@@ -35,11 +35,11 @@ This roadmap outlines all tasks needed to make the application fully functional.
   - [x] Add redirect logic for unauthenticated users
   - [x] Add redirect logic for non-admin users accessing admin routes
 
-- [ ] **Session Management**
-  - [ ] Implement session refresh on app load
-  - [ ] Handle expired sessions gracefully
-  - [ ] Add session timeout warnings
-  - [ ] Implement "Remember Me" functionality (if needed)
+- [x] **Session Management**
+  - [x] Implement session refresh on app load
+  - [x] Handle expired sessions gracefully
+  - [x] Add session timeout warnings
+  - [x] Implement "Remember Me" functionality (handled by Supabase autoRefreshToken)
 
 **Dependencies**: Supabase client already configured  
 **Estimated Effort**: 2-3 days

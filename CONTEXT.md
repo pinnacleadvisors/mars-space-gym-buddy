@@ -26,6 +26,7 @@ mars-space-gym-buddy/
 │   ├── hooks/                     # Custom React hooks
 │   │   ├── useAuth.ts             # Authentication hook (✅ implemented)
 │   │   ├── useAdminAuth.ts        # Admin authentication hook
+│   │   ├── useSessionManager.ts   # Session management hook (✅ implemented)
 │   │   ├── useBookings.ts         # Bookings hook (TODO: implement)
 │   │   ├── useAnalytics.ts        # Analytics hook (TODO: implement)
 │   │   ├── use-mobile.tsx         # Mobile detection hook
@@ -38,7 +39,8 @@ mars-space-gym-buddy/
 │   │   ├── types.ts               # Auto-generated database types
 │   │   ├── utils.ts               # Utility functions
 │   │   └── utils/
-│   │       └── dateUtils.ts       # Date utility functions
+│   │       ├── dateUtils.ts       # Date utility functions
+│   │       └── sessionUtils.ts    # Session error handling utilities
 │   ├── pages/                     # Page components
 │   │   ├── Landing.tsx            # Landing page
 │   │   ├── Login.tsx              # User login
@@ -388,6 +390,10 @@ Defined in `src/index.css`:
 1. User signs up → `handle_new_user()` trigger creates profile and assigns 'member' role
 2. Admin login checks `has_role()` RPC function
 3. `useAdminAuth` hook manages admin state and redirects
+4. `useAuth` hook manages user authentication and session
+5. `useSessionManager` hook monitors session expiration and shows warnings
+6. Session automatically refreshes on app load if expired
+7. Session warnings shown at 15 minutes and 5 minutes before expiration
 
 ### Membership Flow
 1. User clicks "Register Membership" → `create-checkout` function
@@ -468,6 +474,25 @@ import { AdminRoute } from "@/components/auth/AdminRoute";
     </AdminRoute>
   }
 />
+```
+
+### Session Management
+```typescript
+import { useSessionManager } from "@/hooks/useSessionManager";
+import { useAuth } from "@/hooks/useAuth";
+import { withSessionHandling } from "@/lib/utils/sessionUtils";
+
+// Session monitoring (automatically initialized in AppLayout)
+useSessionManager(); // Monitors session and shows warnings
+
+// Manual session refresh
+const { refreshSession } = useAuth();
+await refreshSession();
+
+// Handle session errors in API calls
+const { data, error } = await withSessionHandling(() =>
+  supabase.from('table').select('*')
+);
 ```
 
 ### Supabase Client Usage

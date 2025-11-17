@@ -82,28 +82,55 @@ export const useAuth = () => {
 
   /**
    * Initializes user data on mount and sets up auth state listener
+   * Also handles session refresh on app load
    */
   useEffect(() => {
     let mounted = true;
 
     const initializeAuth = async () => {
       try {
-        // Get initial session
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Get initial session and refresh if needed
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
-        if (error) {
-          console.error('Error getting session:', error);
+        if (sessionError) {
+          console.error('Error getting session:', sessionError);
           if (mounted) {
             setUser(null);
-            setLoading(false);
+    setLoading(false);
           }
           return;
         }
 
-        if (session?.user && mounted) {
-          const userData = await fetchUserData(session.user);
-          setUser(userData);
+        // Check if session exists and is valid
+        if (session) {
+          // Check if session is expired
+          const now = Date.now() / 1000; // Convert to seconds
+          if (session.expires_at && session.expires_at < now) {
+            // Session expired, try to refresh
+            console.log('Session expired, attempting refresh...');
+            const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
+            
+            if (refreshError || !refreshedSession) {
+              console.error('Error refreshing expired session:', refreshError);
+              if (mounted) {
+                setUser(null);
+                setLoading(false);
+              }
+              return;
+            }
+
+            // Use refreshed session
+            if (refreshedSession.user && mounted) {
+              const userData = await fetchUserData(refreshedSession.user);
+              setUser(userData);
+            }
+          } else if (session.user && mounted) {
+            // Session is valid, fetch user data
+            const userData = await fetchUserData(session.user);
+            setUser(userData);
+          }
         } else if (mounted) {
+          // No session
           setUser(null);
         }
       } catch (error) {
@@ -193,7 +220,7 @@ export const useAuth = () => {
         throw error;
       }
 
-      setUser(null);
+    setUser(null);
       return { error: null };
     } catch (error: any) {
       console.error('Logout error:', error);
@@ -257,6 +284,40 @@ export const useAuth = () => {
     }
   };
 
+  /**
+   * Refresh the current session
+   * Useful for manually refreshing before expiration
+   */
+  const refreshSession = async (): Promise<{ success: boolean; error?: any }> => {
+    try {
+      setLoading(true);
+      const { data: { session }, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        console.error('Error refreshing session:', error);
+        // If refresh fails, session might be expired
+        if (error.message?.includes('expired') || error.message?.includes('invalid')) {
+          setUser(null);
+        }
+        return { success: false, error };
+      }
+
+      if (session?.user) {
+        const userData = await fetchUserData(session.user);
+        setUser(userData);
+        return { success: true };
+      }
+
+      return { success: false, error: new Error('No session after refresh') };
+    } catch (error: any) {
+      console.error('Error refreshing session:', error);
+      setUser(null);
+      return { success: false, error };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return {
     user,
     loading,
@@ -264,5 +325,6 @@ export const useAuth = () => {
     logout,
     register,
     getUser,
+    refreshSession,
   };
 };
