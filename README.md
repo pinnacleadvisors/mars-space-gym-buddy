@@ -30,4 +30,11 @@ npm run gen:types && npm run deploy
 
 types
 
+components for working with multiple different platforms:
+
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+
+github access token
+github secrets variable manager
 

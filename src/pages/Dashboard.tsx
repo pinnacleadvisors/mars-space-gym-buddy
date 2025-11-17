@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar, Dumbbell, TrendingUp, Users } from "lucide-react";
-import { toast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 
 interface CheckIn {
   id: string;
@@ -27,6 +27,7 @@ const Dashboard = () => {
   const [bookings, setBookings] = useState<ClassBooking[]>([]);
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   const fetchDashboardData = async () => {
     try {
@@ -74,6 +75,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Derived data

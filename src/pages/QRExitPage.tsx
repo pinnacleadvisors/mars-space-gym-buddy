@@ -153,16 +153,23 @@ const QRExitPage = () => {
 
       if (fetchError) throw fetchError;
 
-      if (checkIns && checkIns.length > 0) {
-        const { error: updateError } = await supabase
-          .from("check_ins")
-          .update({
-            check_out_time: new Date().toISOString()
-          })
-          .eq("id", checkIns[0].id);
-
-        if (updateError) throw updateError;
+      if (!checkIns || checkIns.length === 0) {
+        toast({
+          variant: "destructive",
+          title: "No Check-In Found",
+          description: "You don't have an active check-in to check out from.",
+        });
+        return;
       }
+
+      const { error: updateError } = await supabase
+        .from("check_ins")
+        .update({
+          check_out_time: new Date().toISOString()
+        })
+        .eq("id", checkIns[0].id);
+
+      if (updateError) throw updateError;
 
       toast({
         title: "Checked Out Successfully",
