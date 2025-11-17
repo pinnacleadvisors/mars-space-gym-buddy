@@ -9,7 +9,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "gh-pages -d dist",
-    "gen:types": "npx supabase gen types typescript --project-id yggvabrltcxvkiyjixdv | tee src/types/database.ts"
+    "gen:types": "npx supabase gen types typescript --project-id yggvabrltcxvkiyjixdv | tee src/types/database.ts",
+    "sync:types": "bash scripts/sync-database-types.sh",
+    "watch:types": "bash scripts/watch-database-types.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

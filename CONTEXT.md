@@ -75,6 +75,9 @@ mars-space-gym-buddy/
 │   │   ├── check-subscription/    # Subscription status check
 │   │   └── cancel-subscription/   # Subscription cancellation
 │   └── migrations/                # Database migrations (8 files)
+├── scripts/                       # Utility scripts
+│   ├── sync-database-types.sh    # Script to sync database types from GitHub
+│   └── watch-database-types.sh   # Watch script for auto-pulling type updates
 ├── public/                        # Static public assets
 ├── .github/
 │   └── workflows/
@@ -378,6 +381,8 @@ Defined in `src/index.css`:
 - `preview` - Preview production build
 - `deploy` - Deploy to GitHub Pages
 - `gen:types` - Generate Supabase TypeScript types (updates `src/types/database.ts`)
+- `sync:types` - Sync database types from GitHub (pulls latest changes)
+- `watch:types` - Watch for database type updates and auto-pull (runs in background)
 
 ### GitHub Actions Workflow
 - **File**: `.github/workflows/github-actions-demo.yml`
@@ -393,11 +398,27 @@ Defined in `src/index.css`:
   4. Commits and pushes changes if types were updated
   5. Uses `[skip ci]` in commit message to prevent infinite loops
   6. Creates a summary in GitHub Actions UI with instructions to pull latest changes
-- **Local Sync**: After the workflow runs, pull the latest changes in your IDE:
+- **Local Sync**: After the workflow runs, sync the latest changes using one of these methods:
+  
+  **Option 1: Manual sync (recommended)**
+  ```bash
+  npm run sync:types
+  ```
+  This script checks for remote changes and pulls them safely, handling local modifications.
+  
+  **Option 2: Automatic watch mode**
+  ```bash
+  npm run watch:types
+  ```
+  This runs in the background and automatically pulls database type updates every 30 seconds.
+  Press Ctrl+C to stop watching.
+  
+  **Option 3: Manual git pull**
   ```bash
   git pull origin main
   ```
-  The workflow summary will remind you when types are updated.
+  
+  The workflow summary in GitHub Actions will remind you when types are updated.
 
 ## 📝 Important Notes
 
