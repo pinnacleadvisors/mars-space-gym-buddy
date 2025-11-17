@@ -13,7 +13,7 @@ BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-INTERVAL=${1:-30000} # Default to 30 seconds, can be overridden
+INTERVAL=${1:-30} # Default to 30 seconds, can be overridden
 
 echo -e "${BLUE}👀 Watching for database type updates (checking every ${INTERVAL}s)${NC}"
 echo -e "${YELLOW}Press Ctrl+C to stop${NC}"

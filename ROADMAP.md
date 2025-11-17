@@ -67,14 +67,14 @@ This roadmap outlines all tasks needed to make the application fully functional.
   - [x] Add real-time subscriptions for booking updates
   - [x] Add proper error handling
 
-- [ ] **Update Classes Page**
-  - [ ] Connect "Book Class" button to booking functionality
-  - [ ] Show available spots vs capacity
-  - [ ] Display user's existing bookings
-  - [ ] Add booking confirmation dialog
-  - [ ] Show booking success/error messages
-  - [ ] Filter classes by date, category, instructor
-  - [ ] Add search functionality
+- [x] **Update Classes Page**
+  - [x] Connect "Book Class" button to booking functionality
+  - [x] Show available spots vs capacity
+  - [x] Display user's existing bookings
+  - [x] Add booking confirmation dialog
+  - [x] Show booking success/error messages
+  - [x] Filter classes by date, category, instructor
+  - [x] Add search functionality
 
 - [ ] **Update Bookings Page**
   - [ ] Replace hardcoded data with real bookings

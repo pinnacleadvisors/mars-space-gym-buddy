@@ -48,7 +48,7 @@ mars-space-gym-buddy/
 │   │   ├── ForgotPassword.tsx      # Password reset request
 │   │   ├── ResetPassword.tsx      # Password reset
 │   │   ├── Dashboard.tsx          # User dashboard
-│   │   ├── Classes.tsx            # Class listings
+│   │   ├── Classes.tsx            # Class listings (✅ fully implemented with booking, filters, search)
 │   │   ├── Bookings.tsx           # User bookings
 │   │   ├── ManageMemberships.tsx  # Membership management
 │   │   ├── QREntry.tsx            # QR code check-in
@@ -565,6 +565,18 @@ const MyComponent = () => {
   };
 };
 ```
+
+### Classes Page Features
+The Classes page (`src/pages/Classes.tsx`) includes:
+- **Real-time availability**: Shows available spots vs capacity for each class session
+- **Booking integration**: Uses `useBookings` hook for booking functionality
+- **User bookings display**: Shows which classes the user has already booked
+- **Booking confirmation**: Dialog confirms booking details before creating
+- **Search functionality**: Search classes by name or instructor
+- **Filters**: Filter by instructor, date (today, this week, upcoming, my bookings)
+- **Visual indicators**: Badges show "Full", "Few Spots Left", or "Booked" status
+- **Error handling**: Toast notifications for booking success/failure
+- **Date formatting**: Uses `date-fns` for readable date/time display
 
 ### Supabase Client Usage
 ```typescript
