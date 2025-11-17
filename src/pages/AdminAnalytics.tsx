@@ -1,26 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { TrendingUp, Users, Calendar } from "lucide-react";
-import { useAdminAuth } from "@/hooks/useAdminAuth";
-import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
 
 const AdminAnalytics = () => {
-  const { isAdmin, isLoading } = useAdminAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!isLoading && !isAdmin) {
-      navigate('/admin');
-    }
-  }, [isAdmin, isLoading, navigate]);
-
-  if (isLoading || !isAdmin) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    );
-  }
+  // Auth check is handled by AdminRoute wrapper
 
   return (
     <div className="min-h-screen bg-background p-6">

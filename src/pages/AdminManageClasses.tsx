@@ -10,8 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Plus, Pencil, Trash2, Loader2, CalendarIcon } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
-import { useAdminAuth } from "@/hooks/useAdminAuth";
-import { useNavigate } from "react-router-dom";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
@@ -31,17 +29,10 @@ interface Class {
 }
 
 const AdminManageClasses = () => {
-  const { isAdmin, isLoading: authLoading } = useAdminAuth();
-  const navigate = useNavigate();
+  // Auth check is handled by AdminRoute wrapper
   const { toast } = useToast();
   const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!authLoading && !isAdmin) {
-      navigate('/admin');
-    }
-  }, [isAdmin, authLoading, navigate]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const [scheduleDate, setScheduleDate] = useState<Date>();

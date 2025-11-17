@@ -1,22 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, Calendar, TrendingUp, DollarSign } from "lucide-react";
-import { useAdminAuth } from "@/hooks/useAdminAuth";
-import AdminLogin from "./AdminLogin";
 
 const AdminDashboard = () => {
-  const { isAdmin, isLoading } = useAdminAuth();
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
-      </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return <AdminLogin />;
-  }
+  // Auth check is handled by AdminRoute wrapper
 
   return (
     <div className="min-h-screen bg-background p-6">

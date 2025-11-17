@@ -27,13 +27,13 @@ This roadmap outlines all tasks needed to make the application fully functional.
   - [x] Handle session persistence and refresh
   - [x] Add proper error handling and loading states
 
-- [ ] **Route Protection**
-  - [ ] Create `ProtectedRoute` component wrapper
-  - [ ] Create `AdminRoute` component wrapper
-  - [ ] Protect authenticated routes (`/dashboard`, `/classes`, `/bookings`, etc.)
-  - [ ] Protect admin routes (`/admin/*`)
-  - [ ] Add redirect logic for unauthenticated users
-  - [ ] Add redirect logic for non-admin users accessing admin routes
+- [x] **Route Protection**
+  - [x] Create `ProtectedRoute` component wrapper
+  - [x] Create `AdminRoute` component wrapper
+  - [x] Protect authenticated routes (`/dashboard`, `/classes`, `/bookings`, etc.)
+  - [x] Protect admin routes (`/admin/*`)
+  - [x] Add redirect logic for unauthenticated users
+  - [x] Add redirect logic for non-admin users accessing admin routes
 
 - [ ] **Session Management**
   - [ ] Implement session refresh on app load

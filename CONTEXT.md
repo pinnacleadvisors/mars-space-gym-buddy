@@ -19,6 +19,10 @@ mars-space-gym-buddy/
 │   │   │   ├── BottomNav.tsx      # Mobile bottom navigation
 │   │   │   └── TopBar.tsx         # Top navigation bar
 │   │   └── ui/                    # shadcn/ui components (40+ components)
+│   ├── components/
+│   │   └── auth/                  # Authentication components
+│   │       ├── ProtectedRoute.tsx # Route protection for authenticated users
+│   │       └── AdminRoute.tsx     # Route protection for admin users
 │   ├── hooks/                     # Custom React hooks
 │   │   ├── useAuth.ts             # Authentication hook (✅ implemented)
 │   │   ├── useAdminAuth.ts        # Admin authentication hook
@@ -309,7 +313,7 @@ Used in `.github/workflows/github-actions-demo.yml`:
 - `/forgot-password` - Password reset request
 - `/reset-password` - Password reset form
 
-### Authenticated User Routes
+### Authenticated User Routes (Protected by `ProtectedRoute`)
 - `/dashboard` - User dashboard
 - `/classes` - Browse classes
 - `/bookings` - View/manage bookings
@@ -317,13 +321,23 @@ Used in `.github/workflows/github-actions-demo.yml`:
 - `/qr/entry` - QR check-in (requires valid membership + location)
 - `/qr/exit` - QR check-out (requires active check-in + location)
 
-### Admin Routes
+**Note**: All authenticated routes are wrapped with `ProtectedRoute` component which:
+- Checks if user is authenticated
+- Redirects to `/login` if not authenticated
+- Preserves attempted location for redirect after login
+
+### Admin Routes (Protected by `AdminRoute`)
 - `/admin` - Admin dashboard
 - `/admin/users` - User management
 - `/admin/analytics` - Analytics dashboard
 - `/admin/manageclasses` - Class management
 - `/admin/memberships` - Membership plan management
 - `/admin/usermemberships` - User membership management
+
+**Note**: All admin routes are wrapped with `AdminRoute` component which:
+- Checks if user is authenticated and has admin role
+- Shows `AdminLogin` page if not authenticated or not admin
+- Uses `useAdminAuth` hook to verify admin status
 
 ## 🎨 Styling & Theming
 
@@ -428,6 +442,32 @@ const MyComponent = () => {
   
   return <div>Welcome, {user.full_name}!</div>;
 };
+```
+
+### Route Protection
+```typescript
+import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { AdminRoute } from "@/components/auth/AdminRoute";
+
+// Protect authenticated routes
+<Route
+  path="/dashboard"
+  element={
+    <ProtectedRoute>
+      <Dashboard />
+    </ProtectedRoute>
+  }
+/>
+
+// Protect admin routes
+<Route
+  path="/admin"
+  element={
+    <AdminRoute>
+      <AdminDashboard />
+    </AdminRoute>
+  }
+/>
 ```
 
 ### Supabase Client Usage

@@ -4,6 +4,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
+import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import { AdminRoute } from "./components/auth/AdminRoute";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -33,24 +35,114 @@ const App = () => (
       <BrowserRouter>
         <AppLayout>
           <Routes>
+            {/* Public Routes */}
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/classes" element={<Classes />} />
-            <Route path="/bookings" element={<Bookings />} />
-            <Route path="/managememberships" element={<ManageMemberships />} />
-            <Route path="/qr/entry" element={<QREntry />} />
-            <Route path="/qr/exit" element={<QRExitPage />} />
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/users" element={<AdminUsers />} />
-            <Route path="/admin/analytics" element={<AdminAnalytics />} />
-            <Route path="/admin/manageclasses" element={<AdminManageClasses />} />
-            <Route path="/admin/memberships" element={<AdminManageMemberships />} />
-            <Route path="/admin/usermemberships" element={<AdminUserMemberships />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            
+            {/* Protected Routes - Require Authentication */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/classes"
+              element={
+                <ProtectedRoute>
+                  <Classes />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bookings"
+              element={
+                <ProtectedRoute>
+                  <Bookings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/managememberships"
+              element={
+                <ProtectedRoute>
+                  <ManageMemberships />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/qr/entry"
+              element={
+                <ProtectedRoute>
+                  <QREntry />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/qr/exit"
+              element={
+                <ProtectedRoute>
+                  <QRExitPage />
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Admin Routes - Require Admin Privileges */}
+            <Route
+              path="/admin"
+              element={
+                <AdminRoute>
+                  <AdminDashboard />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/users"
+              element={
+                <AdminRoute>
+                  <AdminUsers />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/analytics"
+              element={
+                <AdminRoute>
+                  <AdminAnalytics />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/manageclasses"
+              element={
+                <AdminRoute>
+                  <AdminManageClasses />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/memberships"
+              element={
+                <AdminRoute>
+                  <AdminManageMemberships />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/usermemberships"
+              element={
+                <AdminRoute>
+                  <AdminUserMemberships />
+                </AdminRoute>
+              }
+            />
+            
+            {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AppLayout>
