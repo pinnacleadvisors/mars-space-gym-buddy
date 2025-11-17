@@ -51,21 +51,21 @@ This roadmap outlines all tasks needed to make the application fully functional.
 **Files**: `src/hooks/useBookings.ts`, `src/pages/Bookings.tsx`, `src/pages/Classes.tsx`
 
 #### Tasks:
-- [ ] **Implement `useBookings` hook**
-  - [ ] Fetch user bookings from `class_bookings` table
-  - [ ] Join with `class_sessions` to get class details
-  - [ ] Filter by user_id and status
-  - [ ] Implement `createBooking()` function
-    - [ ] Validate user has active membership
-    - [ ] Check class capacity before booking
-    - [ ] Prevent duplicate bookings
-    - [ ] Handle booking conflicts
-  - [ ] Implement `cancelBooking()` function
-    - [ ] Update booking status to 'cancelled'
-    - [ ] Check cancellation policy (e.g., can't cancel within 24h)
-    - [ ] Update class capacity count
-  - [ ] Add real-time subscriptions for booking updates
-  - [ ] Add proper error handling
+- [x] **Implement `useBookings` hook**
+  - [x] Fetch user bookings from `class_bookings` table
+  - [x] Join with `class_sessions` to get class details
+  - [x] Filter by user_id and status
+  - [x] Implement `createBooking()` function
+    - [x] Validate user has active membership
+    - [x] Check class capacity before booking
+    - [x] Prevent duplicate bookings
+    - [x] Handle booking conflicts
+  - [x] Implement `cancelBooking()` function
+    - [x] Update booking status to 'cancelled'
+    - [x] Check cancellation policy (e.g., can't cancel within 24h)
+    - [x] Update class capacity count
+  - [x] Add real-time subscriptions for booking updates
+  - [x] Add proper error handling
 
 - [ ] **Update Classes Page**
   - [ ] Connect "Book Class" button to booking functionality

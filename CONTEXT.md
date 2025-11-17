@@ -27,7 +27,7 @@ mars-space-gym-buddy/
 │   │   ├── useAuth.ts             # Authentication hook (✅ implemented)
 │   │   ├── useAdminAuth.ts        # Admin authentication hook
 │   │   ├── useSessionManager.ts   # Session management hook (✅ implemented)
-│   │   ├── useBookings.ts         # Bookings hook (TODO: implement)
+│   │   ├── useBookings.ts         # Bookings hook (✅ implemented)
 │   │   ├── useAnalytics.ts        # Analytics hook (TODO: implement)
 │   │   ├── use-mobile.tsx         # Mobile detection hook
 │   │   └── use-toast.ts           # Toast notification hook
@@ -409,7 +409,7 @@ Defined in `src/index.css`:
 
 ### Known TODOs
 - ✅ `useAuth.ts` - Authentication logic implemented
-- `useBookings.ts` - Booking fetching not implemented
+- ✅ `useBookings.ts` - Booking fetching implemented
 - `useAnalytics.ts` - Analytics fetching not implemented
 
 ## 🐛 Common Issues & Solutions
@@ -493,6 +493,36 @@ await refreshSession();
 const { data, error } = await withSessionHandling(() =>
   supabase.from('table').select('*')
 );
+```
+
+### Bookings Management with useBookings Hook
+```typescript
+import { useBookings } from "@/hooks/useBookings";
+
+const MyComponent = () => {
+  const { bookings, loading, error, createBooking, cancelBooking, refreshBookings } = useBookings();
+
+  // Bookings are automatically fetched and updated in real-time
+  // Includes class session details (name, instructor, start_time, etc.)
+  
+  const handleBook = async (classId: string) => {
+    const result = await createBooking(classId);
+    if (result.success) {
+      // Booking created successfully
+    } else {
+      // Show error: result.error
+    }
+  };
+
+  const handleCancel = async (bookingId: string) => {
+    const result = await cancelBooking(bookingId);
+    if (result.success) {
+      // Booking cancelled successfully
+    } else {
+      // Show error: result.error
+    }
+  };
+};
 ```
 
 ### Supabase Client Usage
