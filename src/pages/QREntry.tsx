@@ -60,50 +60,62 @@ const QREntry = () => {
   };
 
   useEffect(() => {
-    checkLocation();
-  }, []);
-
-  const checkLocation = () => {
-    if (!navigator.geolocation) {
-      setLocationStatus("invalid");
-      toast({
-        variant: "destructive",
-        title: "Location not supported",
-        description: "Your device doesn't support geolocation.",
-      });
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const distance = calculateDistance(
-          position.coords.latitude,
-          position.coords.longitude,
-          TARGET_LAT,
-          TARGET_LNG
-        );
-
-        if (distance <= MAX_DISTANCE_METERS) {
-          setLocationStatus("valid");
-        } else {
+    let isMounted = true;
+    
+    const checkLocation = () => {
+      if (!navigator.geolocation) {
+        if (isMounted) {
           setLocationStatus("invalid");
           toast({
             variant: "destructive",
-            title: "Location Error",
-            description: "You must be at SE16 2RW, London to check in.",
+            title: "Location not supported",
+            description: "Your device doesn't support geolocation.",
           });
         }
-      },
-      (error) => {
-        setLocationStatus("invalid");
-        toast({
-          variant: "destructive",
-          title: "Location Access Denied",
-          description: "Please enable location services to check in.",
-        });
+        return;
       }
-    );
-  };
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          if (!isMounted) return;
+          
+          const distance = calculateDistance(
+            position.coords.latitude,
+            position.coords.longitude,
+            TARGET_LAT,
+            TARGET_LNG
+          );
+
+          if (distance <= MAX_DISTANCE_METERS) {
+            setLocationStatus("valid");
+          } else {
+            setLocationStatus("invalid");
+            toast({
+              variant: "destructive",
+              title: "Location Error",
+              description: "You must be at SE16 2RW, London to check in.",
+            });
+          }
+        },
+        (error) => {
+          if (!isMounted) return;
+          
+          setLocationStatus("invalid");
+          toast({
+            variant: "destructive",
+            title: "Location Access Denied",
+            description: "Please enable location services to check in.",
+          });
+        }
+      );
+    };
+    
+    checkLocation();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleCheckIn = async () => {
     if (!hasMembership) {

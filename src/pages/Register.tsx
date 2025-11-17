@@ -17,10 +17,21 @@ const Register = () => {
   const [showOTP, setShowOTP] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [fullName, setFullName] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (password !== confirmPassword) {
+      toast({
+        variant: "destructive",
+        title: "Password mismatch",
+        description: "Passwords do not match. Please try again.",
+      });
+      return;
+    }
+    
     setIsLoading(true);
 
     try {
@@ -157,6 +168,8 @@ const Register = () => {
                   id="confirmPassword" 
                   type="password" 
                   placeholder="••••••••" 
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   required 
                   disabled={isLoading}
                   minLength={6}
