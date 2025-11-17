@@ -78,7 +78,7 @@ mars-space-gym-buddy/
 ├── public/                        # Static public assets
 ├── .github/
 │   └── workflows/
-│       └── github-actions-demo.yml # CI/CD for type generation
+│       └── github-actions-demo.yml # CI/CD for type generation (auto-updates src/types/database.ts on main branch commits)
 ├── package.json                   # Dependencies and scripts
 ├── vite.config.ts                # Vite configuration
 ├── tsconfig.json                  # TypeScript configuration
@@ -377,7 +377,21 @@ Defined in `src/index.css`:
 - `build` - Build for production
 - `preview` - Preview production build
 - `deploy` - Deploy to GitHub Pages
-- `gen:types` - Generate Supabase TypeScript types
+- `gen:types` - Generate Supabase TypeScript types (updates `src/types/database.ts`)
+
+### GitHub Actions Workflow
+- **File**: `.github/workflows/github-actions-demo.yml`
+- **Trigger**: Runs on every push to `main` branch
+- **Purpose**: Automatically generates and commits updated Supabase types to `src/types/database.ts`
+- **Requirements**: 
+  - `SUPABASE_ACCESS_TOKEN` secret must be set in repository settings
+  - `SUPABASE_PROJECT_ID` secret must be set (value: `yggvabrltcxvkiyjixdv`)
+- **Process**: 
+  1. Installs Supabase CLI
+  2. Generates types using `supabase gen types typescript`
+  3. Checks if `src/types/database.ts` has changes
+  4. Commits and pushes changes if types were updated
+  5. Uses `[skip ci]` in commit message to prevent infinite loops
 
 ## 📝 Important Notes
 
