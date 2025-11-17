@@ -54,5 +54,37 @@ jobs:
 
       - name: Push changes
         if: steps.check-changes.outputs.has_changes == 'true'
+        id: push-changes
         run: |
-          git push origin HEAD:main
+          if git push origin HEAD:main; then
+            echo "push_success=true" >> $GITHUB_OUTPUT
+          else
+            echo "push_success=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      - name: Verify push and create summary
+        if: steps.check-changes.outputs.has_changes == 'true' && steps.push-changes.outputs.push_success == 'true'
+        run: |
+          echo "## ✅ Database Types Updated Successfully" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The Supabase database types have been regenerated and pushed to the \`main\` branch." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**To update your local IDE (Cursor, VS Code, etc.):**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "git pull origin main" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Updated file:** \`src/types/database.ts\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "💡 **Tip:** Check the Actions tab in GitHub to see when types are updated. Pull the latest changes to keep your local types in sync." >> $GITHUB_STEP_SUMMARY
+
+      - name: No changes summary
+        if: steps.check-changes.outputs.has_changes == 'false'
+        run: |
+          echo "ℹ️ No changes detected in database types. \`src/types/database.ts\` is already up to date." >> $GITHUB_STEP_SUMMARY

@@ -392,6 +392,12 @@ Defined in `src/index.css`:
   3. Checks if `src/types/database.ts` has changes
   4. Commits and pushes changes if types were updated
   5. Uses `[skip ci]` in commit message to prevent infinite loops
+  6. Creates a summary in GitHub Actions UI with instructions to pull latest changes
+- **Local Sync**: After the workflow runs, pull the latest changes in your IDE:
+  ```bash
+  git pull origin main
+  ```
+  The workflow summary will remind you when types are updated.
 
 ## 📝 Important Notes
 
