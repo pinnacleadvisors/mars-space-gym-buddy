@@ -57,7 +57,7 @@ mars-space-gym-buddy/
 │   │   ├── AdminDashboard.tsx     # Admin dashboard
 │   │   ├── AdminUsers.tsx         # User management
 │   │   ├── AdminAnalytics.tsx     # Analytics dashboard
-│   │   ├── AdminManageClasses.tsx # Class management
+│   │   ├── AdminManageClasses.tsx # Class management (✅ includes session creation from templates)
 │   │   ├── AdminManageMemberships.tsx # Membership management
 │   │   ├── AdminUserMemberships.tsx   # User membership management
 │   │   └── NotFound.tsx           # 404 page
@@ -74,7 +74,7 @@ mars-space-gym-buddy/
 │   │   ├── create-checkout/       # Stripe checkout creation
 │   │   ├── check-subscription/    # Subscription status check
 │   │   └── cancel-subscription/   # Subscription cancellation
-│   └── migrations/                # Database migrations (8 files)
+│   └── migrations/                # Database migrations (9 files, includes class_sessions link)
 ├── scripts/                       # Utility scripts
 │   ├── sync-database-types.sh    # Script to sync database types from GitHub
 │   └── watch-database-types.sh   # Watch script for auto-pulling type updates
@@ -176,6 +176,7 @@ mars-space-gym-buddy/
 - **Purpose**: Scheduled class instances
 - **Columns**:
   - `id` (uuid, PK)
+  - `class_id` (uuid, FK → classes, nullable) - Links session to class template
   - `name` (text)
   - `instructor` (text)
   - `start_time` (timestamptz)
@@ -183,6 +184,7 @@ mars-space-gym-buddy/
   - `capacity` (integer)
   - `created_at` (timestamptz)
 - **RLS**: Anyone can view, admins can manage
+- **Relationship**: Sessions can be linked to class templates via `class_id` (nullable for standalone sessions)
 
 #### `class_bookings`
 - **Purpose**: User class reservations
@@ -590,6 +592,26 @@ The Bookings page (`src/pages/Bookings.tsx`) includes:
 - **Smart sorting**: Upcoming sorted by earliest first, past sorted by most recent first
 - **Cancel validation**: Only shows cancel button when cancellation is allowed (24+ hours before class)
 - **Error handling**: Toast notifications for all booking operations
+
+### Class Sessions Management
+The AdminManageClasses page (`src/pages/AdminManageClasses.tsx`) includes:
+- **Link classes to sessions**: Database migration adds `class_id` column to `class_sessions` table
+- **Create sessions from templates**: Admins can create sessions from class templates with one click
+- **Recurring session creation**: Create multiple sessions at once (daily, weekly, monthly)
+- **Session scheduling UI**: Full dialog with date picker, time inputs, and capacity settings
+- **Smart defaults**: Pre-fills session details from class template (name, instructor, capacity, duration)
+- **Bulk creation**: Can create up to 52 recurring sessions at once
+- **Database relationship**: Sessions linked to classes via `class_id` foreign key (nullable for standalone sessions)
+
+### Class Session Booking Logic
+The booking system (`useBookings` hook and Classes page) correctly uses `class_sessions`:
+- **Uses `class_sessions` table**: All bookings reference `class_sessions.id` (not `classes.id`)
+- **Session-specific availability**: Each session shows its own availability (X of Y spots)
+- **Real-time capacity checking**: Checks current bookings vs session capacity before allowing booking
+- **Capacity limits enforced**: Prevents booking when session is full
+- **Session-based booking**: Users book specific session instances, not class templates
+- **Availability calculation**: Calculates available spots per session by counting active bookings
+- **Visual indicators**: Shows "Full", "Few Spots Left", or "Booked" status per session
 
 ### Supabase Client Usage
 ```typescript

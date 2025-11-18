@@ -95,17 +95,17 @@ This roadmap outlines all tasks needed to make the application fully functional.
 **Files**: `src/pages/AdminManageClasses.tsx`
 
 #### Tasks:
-- [ ] **Link Classes to Class Sessions**
-  - [ ] Create relationship between `classes` and `class_sessions`
-  - [ ] Allow admins to create sessions from class templates
-  - [ ] Implement recurring session creation
-  - [ ] Add session scheduling UI
+- [x] **Link Classes to Class Sessions**
+  - [x] Create relationship between `classes` and `class_sessions`
+  - [x] Allow admins to create sessions from class templates
+  - [x] Implement recurring session creation
+  - [x] Add session scheduling UI
 
-- [ ] **Class Session Booking Logic**
-  - [ ] Update booking system to use `class_sessions` instead of `classes`
-  - [ ] Show session-specific availability
-  - [ ] Handle session capacity limits
-  - [ ] Implement waitlist functionality (optional)
+- [x] **Class Session Booking Logic**
+  - [x] Update booking system to use `class_sessions` instead of `classes`
+  - [x] Show session-specific availability
+  - [x] Handle session capacity limits
+  - [ ] Implement waitlist functionality (optional - not implemented)
 
 **Dependencies**: Booking system  
 **Estimated Effort**: 2-3 days

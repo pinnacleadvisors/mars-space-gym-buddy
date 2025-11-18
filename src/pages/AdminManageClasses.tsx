@@ -6,13 +6,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Pencil, Trash2, Loader2, CalendarIcon } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, CalendarIcon, Repeat } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format } from "date-fns";
+import { format, addDays, addWeeks, addMonths, startOfWeek, nextDay } from "date-fns";
 import { cn } from "@/lib/utils";
 
 interface Class {
@@ -34,9 +35,20 @@ const AdminManageClasses = () => {
   const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
+  const [selectedClassForSession, setSelectedClassForSession] = useState<Class | null>(null);
   const [scheduleDate, setScheduleDate] = useState<Date>();
   const [scheduleTime, setScheduleTime] = useState<string>("09:00");
+  const [sessionFormData, setSessionFormData] = useState({
+    startDate: undefined as Date | undefined,
+    startTime: "09:00",
+    endTime: "10:00",
+    capacity: 20,
+    recurring: false,
+    recurringType: "weekly" as "daily" | "weekly" | "monthly",
+    recurringCount: 4,
+  });
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -203,7 +215,130 @@ const AdminManageClasses = () => {
     }
   };
 
-  if (authLoading || loading || !isAdmin) {
+  const handleCreateSession = (classItem: Class) => {
+    setSelectedClassForSession(classItem);
+    // Calculate end time based on duration
+    const startHour = 9;
+    const startMinute = 0;
+    const duration = classItem.duration || 60;
+    const endDate = new Date();
+    endDate.setHours(startHour, startMinute + duration, 0);
+    const endTime = format(endDate, "HH:mm");
+    
+    setSessionFormData({
+      startDate: new Date(),
+      startTime: "09:00",
+      endTime: endTime,
+      capacity: classItem.capacity,
+      recurring: false,
+      recurringType: "weekly",
+      recurringCount: 4,
+    });
+    setSessionDialogOpen(true);
+  };
+
+  const handleCreateSessionSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedClassForSession || !sessionFormData.startDate) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select a start date",
+      });
+      return;
+    }
+
+    try {
+      const sessionsToCreate = [];
+      
+      if (sessionFormData.recurring) {
+        // Create recurring sessions
+        let currentDate = new Date(sessionFormData.startDate);
+        const startTimeParts = sessionFormData.startTime.split(":");
+        const endTimeParts = sessionFormData.endTime.split(":");
+        
+        for (let i = 0; i < sessionFormData.recurringCount; i++) {
+          const sessionStart = new Date(currentDate);
+          sessionStart.setHours(parseInt(startTimeParts[0]), parseInt(startTimeParts[1]), 0);
+          
+          const sessionEnd = new Date(currentDate);
+          sessionEnd.setHours(parseInt(endTimeParts[0]), parseInt(endTimeParts[1]), 0);
+          
+          sessionsToCreate.push({
+            class_id: selectedClassForSession.id,
+            name: selectedClassForSession.name,
+            instructor: selectedClassForSession.instructor,
+            start_time: sessionStart.toISOString(),
+            end_time: sessionEnd.toISOString(),
+            capacity: sessionFormData.capacity,
+          });
+
+          // Calculate next date based on recurring type
+          if (sessionFormData.recurringType === "daily") {
+            currentDate = addDays(currentDate, 1);
+          } else if (sessionFormData.recurringType === "weekly") {
+            currentDate = addWeeks(currentDate, 1);
+          } else if (sessionFormData.recurringType === "monthly") {
+            currentDate = addMonths(currentDate, 1);
+          }
+        }
+      } else {
+        // Create single session
+        const startTimeParts = sessionFormData.startTime.split(":");
+        const endTimeParts = sessionFormData.endTime.split(":");
+        
+        const sessionStart = new Date(sessionFormData.startDate);
+        sessionStart.setHours(parseInt(startTimeParts[0]), parseInt(startTimeParts[1]), 0);
+        
+        const sessionEnd = new Date(sessionFormData.startDate);
+        sessionEnd.setHours(parseInt(endTimeParts[0]), parseInt(endTimeParts[1]), 0);
+        
+        sessionsToCreate.push({
+          class_id: selectedClassForSession.id,
+          name: selectedClassForSession.name,
+          instructor: selectedClassForSession.instructor,
+          start_time: sessionStart.toISOString(),
+          end_time: sessionEnd.toISOString(),
+          capacity: sessionFormData.capacity,
+        });
+      }
+
+      const { error } = await supabase
+        .from("class_sessions")
+        .insert(sessionsToCreate);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: `Created ${sessionsToCreate.length} session(s) successfully`,
+      });
+
+      setSessionDialogOpen(false);
+      setSelectedClassForSession(null);
+      resetSessionForm();
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to create session(s)",
+      });
+    }
+  };
+
+  const resetSessionForm = () => {
+    setSessionFormData({
+      startDate: undefined,
+      startTime: "09:00",
+      endTime: "10:00",
+      capacity: 20,
+      recurring: false,
+      recurringType: "weekly",
+      recurringCount: 4,
+    });
+  };
+
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -378,7 +513,7 @@ const AdminManageClasses = () => {
       <Card>
         <CardHeader>
           <CardTitle>All Classes</CardTitle>
-          <CardDescription>Manage your gym's class schedule</CardDescription>
+          <CardDescription>Manage your gym's class schedule and create sessions</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
@@ -425,13 +560,23 @@ const AdminManageClasses = () => {
                           variant="outline"
                           size="icon"
                           onClick={() => handleEdit(classItem)}
+                          title="Edit class"
                         >
                           <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleCreateSession(classItem)}
+                          title="Create session"
+                        >
+                          <CalendarIcon className="w-4 h-4" />
                         </Button>
                         <Button
                           variant="destructive"
                           size="icon"
                           onClick={() => handleDelete(classItem.id)}
+                          title="Delete class"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -444,6 +589,155 @@ const AdminManageClasses = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Create Session Dialog */}
+      <Dialog open={sessionDialogOpen} onOpenChange={setSessionDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Class Session{sessionFormData.recurring ? "s" : ""}</DialogTitle>
+            <DialogDescription>
+              {selectedClassForSession && (
+                <>Create session{sessionFormData.recurring ? "s" : ""} for <strong>{selectedClassForSession.name}</strong></>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateSessionSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Start Date *</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !sessionFormData.startDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {sessionFormData.startDate ? (
+                      format(sessionFormData.startDate, "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={sessionFormData.startDate}
+                    onSelect={(date) => setSessionFormData({ ...sessionFormData, startDate: date })}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="start-time">Start Time *</Label>
+                <Input
+                  id="start-time"
+                  type="time"
+                  value={sessionFormData.startTime}
+                  onChange={(e) => setSessionFormData({ ...sessionFormData, startTime: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="end-time">End Time *</Label>
+                <Input
+                  id="end-time"
+                  type="time"
+                  value={sessionFormData.endTime}
+                  onChange={(e) => setSessionFormData({ ...sessionFormData, endTime: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="capacity">Capacity *</Label>
+              <Input
+                id="capacity"
+                type="number"
+                value={sessionFormData.capacity}
+                onChange={(e) => setSessionFormData({ ...sessionFormData, capacity: parseInt(e.target.value) })}
+                required
+                min="1"
+              />
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="recurring"
+                checked={sessionFormData.recurring}
+                onCheckedChange={(checked) => setSessionFormData({ ...sessionFormData, recurring: checked })}
+              />
+              <Label htmlFor="recurring" className="flex items-center gap-2">
+                <Repeat className="w-4 h-4" />
+                Create recurring sessions
+              </Label>
+            </div>
+
+            {sessionFormData.recurring && (
+              <div className="space-y-4 pl-6 border-l-2">
+                <div className="space-y-2">
+                  <Label htmlFor="recurring-type">Repeat Every</Label>
+                  <Select
+                    value={sessionFormData.recurringType}
+                    onValueChange={(value: "daily" | "weekly" | "monthly") =>
+                      setSessionFormData({ ...sessionFormData, recurringType: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Day</SelectItem>
+                      <SelectItem value="weekly">Week</SelectItem>
+                      <SelectItem value="monthly">Month</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="recurring-count">Number of Sessions *</Label>
+                  <Input
+                    id="recurring-count"
+                    type="number"
+                    value={sessionFormData.recurringCount}
+                    onChange={(e) =>
+                      setSessionFormData({ ...sessionFormData, recurringCount: parseInt(e.target.value) })
+                    }
+                    required
+                    min="1"
+                    max="52"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Will create {sessionFormData.recurringCount} session(s) starting from the selected date
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setSessionDialogOpen(false);
+                  resetSessionForm();
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">
+                Create Session{sessionFormData.recurring ? "s" : ""}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
