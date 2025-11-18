@@ -1,0 +1,28 @@
+{
+  "name": "Mars Space Gym Buddy",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:18",
+  "features": {},
+  "postCreateCommand": "npm install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss"
+      ]
+    }
+  },
+  "remoteEnv": {
+    // Environment variables will be automatically loaded from GitHub Codespaces Secrets
+    // No need to set them here - they're available via Codespaces Secrets
+    // Access them via: import.meta.env.VITE_SUPABASE_URL, etc.
+  },
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": {
+      "label": "Vite Dev Server",
+      "onAutoForward": "notify"
+    }
+  }
+}
+

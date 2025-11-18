@@ -157,11 +157,35 @@ This roadmap outlines all tasks needed to make the application fully functional.
 
 #### Tasks:
 - [ ] **Environment Variables**
-  - [ ] Remove hardcoded Supabase credentials from `client.ts`
-  - [ ] Create `.env.example` file with required variables
+  - [x] Ensure `.env` is in `.gitignore` (completed)
+  - [x] Create `ENV_SETUP.md` with cloud development guide (completed)
+  - [x] Create `.devcontainer/devcontainer.json` for Codespaces (completed)
+  - [ ] Set up GitHub Codespaces Secrets (see instructions below)
+  - [ ] Remove hardcoded Supabase credentials from `client.ts` (optional - fallbacks are fine for dev)
   - [ ] Document environment setup in README
-  - [ ] Ensure `.env` is in `.gitignore`
   - [ ] Set up GitHub Secrets for CI/CD properly
+
+  **📋 How to Set Up Environment Variables in GitHub Cloud:**
+  
+  **For GitHub Codespaces (Recommended for Cloud Development):**
+  1. Go to: https://github.com/settings/codespaces (or Repository → Settings → Secrets and variables → Codespaces)
+  2. Click "New secret" and add:
+     - Name: `VITE_SUPABASE_URL`, Value: `https://yggvabrltcxvkiyjixdv.supabase.co`
+     - Name: `VITE_SUPABASE_ANON_KEY`, Value: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` (your anon key)
+  3. These secrets are automatically available as environment variables in all your Codespaces
+  4. No `.env` file needed! Variables are accessible via `import.meta.env.VITE_*`
+  
+  **For Cursor Cloud / Other Cloud IDEs:**
+  - Check the platform's settings for "Environment Variables" or "Secrets"
+  - Add the same variables there
+  - See `ENV_SETUP.md` for detailed instructions
+  
+  **Benefits:**
+  - ✅ No local `.env` files needed
+  - ✅ Secrets stored securely in GitHub
+  - ✅ Available in all Codespaces automatically
+  - ✅ Works with Cursor Cloud and other cloud IDEs
+  - ✅ Can be scoped per repository, user, or organization
 
 - [ ] **Input Validation**
   - [ ] Add client-side validation for all forms
