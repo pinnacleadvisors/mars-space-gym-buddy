@@ -56,7 +56,7 @@ mars-space-gym-buddy/
 │   │   ├── AdminLogin.tsx         # Admin login
 │   │   ├── AdminDashboard.tsx     # Admin dashboard
 │   │   ├── AdminUsers.tsx         # User management
-│   │   ├── AdminAnalytics.tsx     # Analytics dashboard
+│   │   ├── AdminAnalytics.tsx     # Analytics dashboard (✅ fully implemented with charts, date filtering, export)
 │   │   ├── AdminManageClasses.tsx # Class management (✅ includes session creation from templates)
 │   │   ├── AdminManageMemberships.tsx # Membership management
 │   │   ├── AdminUserMemberships.tsx   # User membership management
@@ -629,7 +629,7 @@ The `useAnalytics` hook (`src/hooks/useAnalytics.ts`) provides comprehensive ana
   import { useAnalytics } from "@/hooks/useAnalytics";
   
   const MyComponent = () => {
-    const { data, revenueData, loading, error, refresh } = useAnalytics({
+    const { data, revenueData, memberGrowth, loading, error, refresh } = useAnalytics({
       dateRange: {
         startDate: new Date('2024-01-01'),
         endDate: new Date('2024-12-31'),
@@ -639,8 +639,24 @@ The `useAnalytics` hook (`src/hooks/useAnalytics.ts`) provides comprehensive ana
     // data contains: total_members, active_members, total_visits_today,
     // total_bookings, popular_classes, visit_trends, membership_breakdown
     // revenueData contains: period, revenue, new_members, renewals
+    // memberGrowth contains: totalMembers, activeMembers, growthThisMonth, growthPercentage
   };
   ```
+
+### Admin Analytics Page Features
+The AdminAnalytics page (`src/pages/AdminAnalytics.tsx`) includes:
+- **Real-time metrics**: Total members, member growth, class attendance, visits today
+- **Visit trends chart**: Area chart showing daily visits and unique visitors over time (Recharts)
+- **Class popularity chart**: Bar chart showing most booked classes (Recharts)
+- **Revenue trends chart**: Line chart showing monthly revenue and new members (Recharts)
+- **Membership breakdown**: Pie chart showing active, inactive, and cancelled memberships (Recharts)
+- **Top classes list**: Table showing top 5 classes by attendance rate
+- **Date range picker**: Preset options (7 days, 30 days, 90 days, this month) and custom range selector
+- **Export functionality**: CSV export (includes all data) and PDF export (print dialog)
+- **Refresh button**: Manual data refresh with loading states
+- **Loading states**: Skeleton loaders and spinners during data fetch
+- **Error handling**: Error display with retry functionality
+- **Responsive design**: Grid layouts that adapt to screen size
 
 ### Supabase Client Usage
 ```typescript

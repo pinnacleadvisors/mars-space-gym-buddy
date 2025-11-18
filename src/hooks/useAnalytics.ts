@@ -19,6 +19,12 @@ export const useAnalytics = (filters?: AnalyticsFilters) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [revenueData, setRevenueData] = useState<RevenueData[]>([]);
+  const [memberGrowth, setMemberGrowth] = useState<{
+    totalMembers: number;
+    activeMembers: number;
+    growthThisMonth: number;
+    growthPercentage: number;
+  } | null>(null);
 
   // Default date range: last 30 days
   const getDefaultDateRange = useCallback((): DateRange => {
@@ -518,6 +524,7 @@ export const useAnalytics = (filters?: AnalyticsFilters) => {
 
       setData(analyticsData);
       setRevenueData(revenue);
+      setMemberGrowth(memberGrowth);
     } catch (err: any) {
       console.error('Error fetching analytics:', err);
       setError(err.message || 'Failed to fetch analytics data');
@@ -549,6 +556,7 @@ export const useAnalytics = (filters?: AnalyticsFilters) => {
   return {
     data,
     revenueData,
+    memberGrowth,
     loading,
     error,
     refresh,

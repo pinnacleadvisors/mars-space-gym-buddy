@@ -129,15 +129,15 @@ This roadmap outlines all tasks needed to make the application fully functional.
   - [x] Add date range filtering
   - [x] Implement data aggregation queries
 
-- [ ] **Update Admin Analytics Page**
-  - [ ] Replace placeholder metrics with real data
-  - [ ] Implement visit trends chart (use Recharts)
-  - [ ] Implement class popularity chart
-  - [ ] Add member growth chart
-  - [ ] Add revenue chart (if applicable)
-  - [ ] Add date range picker
-  - [ ] Add export functionality (CSV/PDF)
-  - [ ] Add real-time data refresh
+- [x] **Update Admin Analytics Page**
+  - [x] Replace placeholder metrics with real data
+  - [x] Implement visit trends chart (use Recharts)
+  - [x] Implement class popularity chart
+  - [x] Add member growth chart
+  - [x] Add revenue chart (if applicable)
+  - [x] Add date range picker
+  - [x] Add export functionality (CSV/PDF)
+  - [x] Add real-time data refresh
 
 - [ ] **Create Database Views/Functions** (if needed)
   - [ ] Create view for daily visit counts
