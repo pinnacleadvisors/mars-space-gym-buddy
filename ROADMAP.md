@@ -119,15 +119,15 @@ This roadmap outlines all tasks needed to make the application fully functional.
 **Files**: `src/hooks/useAnalytics.ts`, `src/pages/AdminAnalytics.tsx`
 
 #### Tasks:
-- [ ] **Implement `useAnalytics` hook**
-  - [ ] Fetch member growth statistics
-  - [ ] Calculate class attendance rates
-  - [ ] Get active user counts
-  - [ ] Fetch visit trends over time
-  - [ ] Get class popularity metrics
-  - [ ] Calculate revenue metrics (if applicable)
-  - [ ] Add date range filtering
-  - [ ] Implement data aggregation queries
+- [x] **Implement `useAnalytics` hook**
+  - [x] Fetch member growth statistics
+  - [x] Calculate class attendance rates
+  - [x] Get active user counts
+  - [x] Fetch visit trends over time
+  - [x] Get class popularity metrics
+  - [x] Calculate revenue metrics (if applicable)
+  - [x] Add date range filtering
+  - [x] Implement data aggregation queries
 
 - [ ] **Update Admin Analytics Page**
   - [ ] Replace placeholder metrics with real data

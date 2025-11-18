@@ -28,7 +28,7 @@ mars-space-gym-buddy/
 │   │   ├── useAdminAuth.ts        # Admin authentication hook
 │   │   ├── useSessionManager.ts   # Session management hook (✅ implemented)
 │   │   ├── useBookings.ts         # Bookings hook (✅ implemented)
-│   │   ├── useAnalytics.ts        # Analytics hook (TODO: implement)
+│   │   ├── useAnalytics.ts        # Analytics hook (✅ implemented)
 │   │   ├── use-mobile.tsx         # Mobile detection hook
 │   │   └── use-toast.ts           # Toast notification hook
 │   ├── integrations/
@@ -453,7 +453,7 @@ Defined in `src/index.css`:
 ### Known TODOs
 - ✅ `useAuth.ts` - Authentication logic implemented
 - ✅ `useBookings.ts` - Booking fetching implemented
-- `useAnalytics.ts` - Analytics fetching not implemented
+- ✅ `useAnalytics.ts` - Analytics fetching implemented
 
 ## 🐛 Common Issues & Solutions
 
@@ -612,6 +612,35 @@ The booking system (`useBookings` hook and Classes page) correctly uses `class_s
 - **Session-based booking**: Users book specific session instances, not class templates
 - **Availability calculation**: Calculates available spots per session by counting active bookings
 - **Visual indicators**: Shows "Full", "Few Spots Left", or "Booked" status per session
+
+### Analytics with useAnalytics Hook
+The `useAnalytics` hook (`src/hooks/useAnalytics.ts`) provides comprehensive analytics data:
+- **Member growth statistics**: Total members, active members, growth percentage vs last month
+- **Class attendance rates**: Calculates attendance rate based on completed sessions and attended bookings
+- **Active user counts**: This week, this month, and total active members
+- **Visit trends**: Daily visit counts and unique visitors over time (with date range filtering)
+- **Class popularity metrics**: Most booked classes with attendance rates and categories
+- **Revenue metrics**: Monthly revenue breakdown with new members and renewals
+- **Membership breakdown**: Active, inactive, and cancelled memberships
+- **Date range filtering**: Supports custom date ranges (defaults to last 30 days)
+- **Data aggregation**: Efficient queries with parallel fetching for optimal performance
+- **Usage example**:
+  ```typescript
+  import { useAnalytics } from "@/hooks/useAnalytics";
+  
+  const MyComponent = () => {
+    const { data, revenueData, loading, error, refresh } = useAnalytics({
+      dateRange: {
+        startDate: new Date('2024-01-01'),
+        endDate: new Date('2024-12-31'),
+      },
+    });
+    
+    // data contains: total_members, active_members, total_visits_today,
+    // total_bookings, popular_classes, visit_trends, membership_breakdown
+    // revenueData contains: period, revenue, new_members, renewals
+  };
+  ```
 
 ### Supabase Client Usage
 ```typescript
