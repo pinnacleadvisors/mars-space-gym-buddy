@@ -1,6 +1,5 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { Dumbbell } from "lucide-react";
@@ -9,6 +8,18 @@ import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { registerSchema, type RegisterFormData } from "@/lib/validations/auth";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { sanitizeEmail, sanitizeString } from "@/lib/utils/sanitize";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -16,31 +27,31 @@ const Register = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showOTP, setShowOTP] = useState(false);
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [fullName, setFullName] = useState("");
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (password !== confirmPassword) {
-      toast({
-        variant: "destructive",
-        title: "Password mismatch",
-        description: "Passwords do not match. Please try again.",
-      });
-      return;
-    }
-    
+  const form = useForm<RegisterFormData>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      fullName: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
+  const handleSubmit = async (data: RegisterFormData) => {
     setIsLoading(true);
 
     try {
+      // Sanitize inputs
+      const sanitizedEmail = sanitizeEmail(data.email);
+      const sanitizedFullName = sanitizeString(data.fullName);
+
       const { error } = await supabase.auth.signUp({
-        email,
-        password,
+        email: sanitizedEmail,
+        password: data.password,
         options: {
           data: {
-            full_name: fullName,
+            full_name: sanitizedFullName,
           },
           emailRedirectTo: `${window.location.origin}/dashboard`,
         },
@@ -48,6 +59,7 @@ const Register = () => {
 
       if (error) throw error;
 
+      setEmail(sanitizedEmail);
       setShowOTP(true);
       toast({
         title: "Verification code sent",
@@ -124,61 +136,84 @@ const Register = () => {
         </CardHeader>
         <CardContent>
           {!showOTP ? (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name</Label>
-                <Input 
-                  id="fullName" 
-                  type="text" 
-                  placeholder="John Doe" 
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  required 
-                  disabled={isLoading}
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="fullName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Full Name</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="John Doe"
+                          disabled={isLoading}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input 
-                  id="email" 
-                  type="email" 
-                  placeholder="your@email.com" 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required 
-                  disabled={isLoading}
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Email</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="email"
+                          placeholder="your@email.com"
+                          disabled={isLoading}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <Input 
-                  id="password" 
-                  type="password" 
-                  placeholder="••••••••" 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required 
-                  disabled={isLoading}
-                  minLength={6}
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="••••••••"
+                          disabled={isLoading}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <Input 
-                  id="confirmPassword" 
-                  type="password" 
-                  placeholder="••••••••" 
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  required 
-                  disabled={isLoading}
-                  minLength={6}
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm Password</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="password"
+                          placeholder="••••••••"
+                          disabled={isLoading}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isLoading}>
-                {isLoading ? "Creating Account..." : "Create Account"}
-              </Button>
-            </form>
+                <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isLoading}>
+                  {isLoading ? "Creating Account..." : "Create Account"}
+                </Button>
+              </form>
+            </Form>
           ) : (
             <div className="space-y-4">
               <div className="text-center space-y-2">

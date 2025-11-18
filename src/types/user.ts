@@ -11,6 +11,7 @@ export interface User {
   membership_end_date?: string;
   created_at: string;
   updated_at: string;
+  email_verified?: boolean;
 }
 
 export interface UserProfile extends User {

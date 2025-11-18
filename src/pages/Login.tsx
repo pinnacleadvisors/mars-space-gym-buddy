@@ -1,32 +1,148 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
-import { Dumbbell } from "lucide-react";
+import { Dumbbell, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
-import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { loginSchema, type LoginFormData } from "@/lib/validations/auth";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { sanitizeEmail } from "@/lib/utils/sanitize";
+import { 
+  recordFailedAttempt, 
+  clearLockout, 
+  isAccountLocked, 
+  formatLockoutTime,
+  getRemainingAttempts 
+} from "@/lib/utils/accountLockout";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Login = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [lockoutInfo, setLockoutInfo] = useState<{
+    isLocked: boolean;
+    lockedUntil: number | null;
+    remainingTime: number | null;
+  } | null>(null);
+  const [remainingAttempts, setRemainingAttempts] = useState<number | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const form = useForm<LoginFormData>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  // Check lockout status when email changes
+  const email = form.watch("email");
+  useEffect(() => {
+    if (email) {
+      const sanitizedEmail = sanitizeEmail(email);
+      const lockout = isAccountLocked(sanitizedEmail);
+      const attempts = getRemainingAttempts(sanitizedEmail);
+      setLockoutInfo(lockout);
+      setRemainingAttempts(attempts);
+    } else {
+      setLockoutInfo(null);
+      setRemainingAttempts(null);
+    }
+  }, [email]);
+
+  const handleSubmit = async (data: LoginFormData) => {
     setIsLoading(true);
 
     try {
+      // Sanitize email
+      const sanitizedEmail = sanitizeEmail(data.email);
+
+      // Check if account is locked
+      const lockout = isAccountLocked(sanitizedEmail);
+      if (lockout.isLocked && lockout.remainingTime) {
+        const timeRemaining = formatLockoutTime(lockout.remainingTime);
+        toast({
+          variant: "destructive",
+          title: "Account Locked",
+          description: `Too many failed login attempts. Please try again in ${timeRemaining}.`,
+        });
+        setLockoutInfo(lockout);
+        setIsLoading(false);
+        return;
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+        email: sanitizedEmail,
+        password: data.password,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Record failed attempt
+        const lockoutResult = recordFailedAttempt(sanitizedEmail);
+        const attempts = getRemainingAttempts(sanitizedEmail);
+        setRemainingAttempts(attempts);
+        setLockoutInfo({
+          isLocked: lockoutResult.isLocked,
+          lockedUntil: lockoutResult.lockedUntil,
+          remainingTime: lockoutResult.lockedUntil 
+            ? lockoutResult.lockedUntil - Date.now() 
+            : null,
+        });
+
+        // Check if account is now locked
+        if (lockoutResult.isLocked && lockoutResult.lockedUntil) {
+          const timeRemaining = formatLockoutTime(lockoutResult.lockedUntil - Date.now());
+          toast({
+            variant: "destructive",
+            title: "Account Locked",
+            description: `Too many failed login attempts. Please try again in ${timeRemaining}.`,
+          });
+          throw error;
+        }
+
+        // Show remaining attempts if not locked
+        if (attempts > 0) {
+          toast({
+            variant: "destructive",
+            title: "Login failed",
+            description: `${error.message}. ${attempts} attempt${attempts !== 1 ? 's' : ''} remaining before account lockout.`,
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Login failed",
+            description: error.message,
+          });
+        }
+        throw error;
+      }
+
+      // Clear lockout on successful login
+      clearLockout(sanitizedEmail);
+      setLockoutInfo(null);
+      setRemainingAttempts(null);
+
+      // Check if email is verified
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && !user.email_confirmed_at) {
+        toast({
+          variant: "default",
+          title: "Email verification required",
+          description: "Please verify your email address to access all features.",
+        });
+      }
 
       toast({
         title: "Welcome back!",
@@ -34,11 +150,7 @@ const Login = () => {
       });
       navigate("/dashboard");
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Login failed",
-        description: error.message,
-      });
+      // Error already handled above
     } finally {
       setIsLoading(false);
     }
@@ -74,44 +186,79 @@ const Login = () => {
           <CardDescription>Sign in to access your gym account</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input 
-                id="email" 
-                type="email" 
-                placeholder="your@email.com" 
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required 
-                disabled={isLoading}
+          {lockoutInfo?.isLocked && lockoutInfo.remainingTime && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Account locked due to too many failed login attempts. 
+                Please try again in {formatLockoutTime(lockoutInfo.remainingTime)}.
+              </AlertDescription>
+            </Alert>
+          )}
+          {remainingAttempts !== null && remainingAttempts > 0 && remainingAttempts < 5 && !lockoutInfo?.isLocked && (
+            <Alert className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                {remainingAttempts} attempt{remainingAttempts !== 1 ? 's' : ''} remaining before account lockout.
+              </AlertDescription>
+            </Alert>
+          )}
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="your@email.com"
+                        disabled={isLoading}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <button
-                  type="button"
-                  onClick={() => navigate("/forgot-password")}
-                  className="text-xs text-secondary hover:underline"
-                >
-                  Forgot password?
-                </button>
-              </div>
-              <Input 
-                id="password" 
-                type="password" 
-                placeholder="••••••••" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required 
-                disabled={isLoading}
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <div className="flex items-center justify-between">
+                      <FormLabel>Password</FormLabel>
+                      <button
+                        type="button"
+                        onClick={() => navigate("/forgot-password")}
+                        className="text-xs text-secondary hover:underline"
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        disabled={isLoading}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <Button type="submit" className="w-full bg-secondary hover:bg-secondary/90" disabled={isLoading}>
-              {isLoading ? "Signing in..." : "Sign In"}
-            </Button>
-          </form>
+              <Button 
+                type="submit" 
+                className="w-full bg-secondary hover:bg-secondary/90" 
+                disabled={isLoading || (lockoutInfo?.isLocked ?? false)}
+              >
+                {isLoading ? "Signing in..." : lockoutInfo?.isLocked ? "Account Locked" : "Sign In"}
+              </Button>
+            </form>
+          </Form>
 
           <div className="relative my-6">
             <Separator />

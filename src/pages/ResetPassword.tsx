@@ -8,6 +8,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { resetPasswordSchema, type ResetPasswordFormData } from "@/lib/validations/auth";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -42,14 +53,7 @@ const ResetPassword = () => {
       return;
     }
 
-    if (newPassword.length < 6) {
-      toast({
-        variant: "destructive",
-        title: "Password too short",
-        description: "Password must be at least 6 characters long.",
-      });
-      return;
-    }
+    // Password validation is handled by the form schema
 
     setIsLoading(true);
 

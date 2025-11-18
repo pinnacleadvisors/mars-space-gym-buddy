@@ -23,12 +23,15 @@ mars-space-gym-buddy/
 │   │   └── auth/                  # Authentication components
 │   │       ├── ProtectedRoute.tsx # Route protection for authenticated users
 │   │       └── AdminRoute.tsx     # Route protection for admin users
+│   │   └── error/                 # Error handling components
+│   │       └── ErrorBoundary.tsx  # React error boundary component
 │   ├── hooks/                     # Custom React hooks
 │   │   ├── useAuth.ts             # Authentication hook (✅ implemented)
 │   │   ├── useAdminAuth.ts        # Admin authentication hook
 │   │   ├── useSessionManager.ts   # Session management hook (✅ implemented)
 │   │   ├── useBookings.ts         # Bookings hook (✅ implemented)
 │   │   ├── useAnalytics.ts        # Analytics hook (✅ implemented)
+│   │   ├── useErrorHandler.ts     # Error handling hook (✅ implemented)
 │   │   ├── use-mobile.tsx         # Mobile detection hook
 │   │   └── use-toast.ts           # Toast notification hook
 │   ├── integrations/
@@ -40,13 +43,25 @@ mars-space-gym-buddy/
 │   │   ├── utils.ts               # Utility functions
 │   │   └── utils/
 │   │       ├── dateUtils.ts       # Date utility functions
-│   │       └── sessionUtils.ts    # Session error handling utilities
+│   │       ├── sessionUtils.ts    # Session error handling utilities
+│   │       ├── sanitize.ts        # Input sanitization utilities
+│   │       ├── rateLimit.ts       # Client-side rate limiting utilities
+│   │       ├── accountLockout.ts  # Account lockout tracking utilities
+│   │       ├── errorLogger.ts     # Error logging utility
+│   │       ├── errorHandler.ts    # Global error handling utility
+│   │       └── networkErrorHandler.ts # Network error handling utility
+│   ├── lib/
+│   │   └── validations/          # Zod validation schemas
+│   │       ├── auth.ts            # Authentication form schemas
+│   │       ├── class.ts           # Class and session schemas
+│   │       └── membership.ts      # Membership schemas
 │   ├── pages/                     # Page components
 │   │   ├── Landing.tsx            # Landing page
 │   │   ├── Login.tsx              # User login
 │   │   ├── Register.tsx           # User registration
 │   │   ├── ForgotPassword.tsx      # Password reset request
 │   │   ├── ResetPassword.tsx      # Password reset
+│   │   ├── EmailVerificationRequired.tsx # Email verification required page
 │   │   ├── Dashboard.tsx          # User dashboard
 │   │   ├── Classes.tsx            # Class listings (✅ fully implemented with booking, filters, search)
 │   │   ├── Bookings.tsx           # User bookings (✅ fully implemented with list/calendar views, cancel functionality)
@@ -71,10 +86,15 @@ mars-space-gym-buddy/
 ├── supabase/
 │   ├── config.toml                # Supabase project config
 │   ├── functions/                 # Edge Functions (Deno)
+│   │   ├── _shared/               # Shared utilities
+│   │   │   └── validation.ts     # Server-side validation utilities
 │   │   ├── create-checkout/       # Stripe checkout creation
 │   │   ├── check-subscription/    # Subscription status check
 │   │   └── cancel-subscription/   # Subscription cancellation
-│   └── migrations/                # Database migrations (9 files, includes class_sessions link)
+│   └── migrations/                # Database migrations (10 files, includes RLS policies)
+├── docs/                          # Documentation
+│   ├── RLS_POLICY_AUDIT.md       # Comprehensive RLS policy audit
+│   └── RLS_TEST_CASES.md         # RLS policy test cases
 ├── scripts/                       # Utility scripts
 │   ├── sync-database-types.sh    # Script to sync database types from GitHub
 │   └── watch-database-types.sh   # Watch script for auto-pulling type updates
@@ -136,7 +156,10 @@ mars-space-gym-buddy/
   - `user_id` (uuid, FK → auth.users)
   - `role` (app_role enum: 'admin', 'staff', 'member')
   - `created_at` (timestamptz)
-- **RLS**: Users can view own roles, admins can manage all
+- **RLS**: 
+  - Users can view own roles (`auth.uid() = user_id`)
+  - Admins can view all roles (`has_role(auth.uid(), 'admin')`)
+  - Admins can insert/update/delete all roles
 
 #### `profiles`
 - **Purpose**: Extended user profile data
@@ -194,7 +217,9 @@ mars-space-gym-buddy/
   - `class_id` (uuid, FK → class_sessions)
   - `status` (text, default 'booked')
   - `created_at` (timestamptz)
-- **RLS**: Users can manage own bookings, admins can view/update all
+- **RLS**: 
+  - Users can view/insert/update/delete own bookings (`auth.uid() = user_id`)
+  - Admins can view/update/delete all bookings (`has_role(auth.uid(), 'admin')`)
 
 #### `memberships`
 - **Purpose**: Membership plan definitions
@@ -232,7 +257,9 @@ mars-space-gym-buddy/
   - `duration_minutes` (integer, nullable, auto-calculated)
   - `location` (text)
   - `created_at` (timestamptz)
-- **RLS**: Users can manage own check-ins, admins can view/update all
+- **RLS**: 
+  - Users can view/insert/update own check-ins (`auth.uid() = user_id`)
+  - Admins can view/update/delete all check-ins (`has_role(auth.uid(), 'admin')`)
 - **Trigger**: Auto-calculates duration on checkout
 
 ### Database Functions
@@ -296,6 +323,7 @@ Used in `.github/workflows/github-actions-demo.yml`:
 - **Price ID**: `price_1STEriRpTziRf7OxCPXLGPLw` (£150/month)
 - **Success URL**: `/managememberships?success=true&session_id={CHECKOUT_SESSION_ID}`
 - **Cancel URL**: `/managememberships?canceled=true`
+- **Validation**: Server-side email validation and rate limiting (5 requests per minute per IP)
 
 ### `check-subscription`
 - **Purpose**: Check Stripe subscription status and sync with database
@@ -431,12 +459,15 @@ Defined in `src/index.css`:
 
 ### Authentication Flow
 1. User signs up → `handle_new_user()` trigger creates profile and assigns 'member' role
-2. Admin login checks `has_role()` RPC function
-3. `useAdminAuth` hook manages admin state and redirects
-4. `useAuth` hook manages user authentication and session
-5. `useSessionManager` hook monitors session expiration and shows warnings
-6. Session automatically refreshes on app load if expired
-7. Session warnings shown at 15 minutes and 5 minutes before expiration
+2. Email verification code sent → User must verify email before accessing protected routes
+3. Admin login checks `has_role()` RPC function
+4. `useAdminAuth` hook manages admin state and redirects
+5. `useAuth` hook manages user authentication and session
+6. `useSessionManager` hook monitors session expiration and shows warnings
+7. Session automatically refreshes on app load if expired
+8. Session warnings shown at 15 minutes and 5 minutes before expiration
+9. Email verification enforced via `ProtectedRoute` component
+10. Account lockout after 5 failed login attempts (15 minute lockout duration)
 
 ### Membership Flow
 1. User clicks "Register Membership" → `create-checkout` function
@@ -706,6 +737,195 @@ const { data: isAdmin } = await supabase.rpc('has_role', {
   _user_id: user.id,
   _role: 'admin'
 });
+```
+
+### Form Validation with Zod and react-hook-form
+All forms use Zod schemas for validation and react-hook-form for form management:
+```typescript
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { registerSchema, type RegisterFormData } from "@/lib/validations/auth";
+import { sanitizeEmail, sanitizeString } from "@/lib/utils/sanitize";
+
+const form = useForm<RegisterFormData>({
+  resolver: zodResolver(registerSchema),
+  defaultValues: { /* ... */ },
+});
+
+const handleSubmit = async (data: RegisterFormData) => {
+  // Sanitize inputs before sending
+  const sanitizedEmail = sanitizeEmail(data.email);
+  const sanitizedName = sanitizeString(data.fullName);
+  // ... rest of submission logic
+};
+```
+
+**Validation Schemas:**
+- `src/lib/validations/auth.ts`: Login, Register, ForgotPassword, ResetPassword schemas
+- `src/lib/validations/class.ts`: Class and session creation schemas
+- `src/lib/validations/membership.ts`: Membership creation schemas
+
+**Password Requirements:**
+- Minimum 8 characters
+- At least one uppercase letter
+- At least one lowercase letter
+- At least one number
+
+**Input Sanitization:**
+- `sanitizeString()`: Removes null bytes and control characters
+- `sanitizeEmail()`: Normalizes and cleans email addresses
+- `sanitizeUrl()`: Validates and sanitizes URLs
+- `escapeHtml()`: Escapes HTML special characters
+
+**Rate Limiting:**
+- Client-side rate limiting utility (`src/lib/utils/rateLimit.ts`)
+- Server-side rate limiting in Edge Functions (5 requests per minute per IP)
+- Configurable limits per action type
+
+### Row Level Security (RLS) Policies
+All tables have RLS enabled with comprehensive policies:
+
+**Policy Patterns:**
+- **User Isolation**: Users can only access their own data (`auth.uid() = user_id` or `auth.uid() = id`)
+- **Admin Access**: Admins can access all data (`has_role(auth.uid(), 'admin')`)
+- **Public Read**: Some tables allow public read access (e.g., active classes, memberships)
+- **Admin Management**: Only admins can insert/update/delete management data
+
+**Security Functions:**
+- `has_role(_user_id uuid, _role app_role)`: SECURITY DEFINER function to check user roles
+- `has_valid_membership(_user_id uuid)`: SECURITY DEFINER function to check active memberships
+- Both functions use `SET search_path = public` to prevent search path attacks
+
+**RLS Audit:**
+- Comprehensive audit completed (see `docs/RLS_POLICY_AUDIT.md`)
+- All edge cases tested (see `docs/RLS_TEST_CASES.md`)
+- Missing policies added via migration `20250115000001_add_missing_rls_policies.sql`
+- All admin functions verified as secure (SECURITY DEFINER with proper search_path)
+
+**Key Security Features:**
+- ✅ Users cannot access other users' data
+- ✅ Admins have full access for management
+- ✅ Public read access limited to appropriate data
+- ✅ All SECURITY DEFINER functions properly secured
+- ✅ No data leakage through function returns
+
+### Authentication Security Features
+The application implements comprehensive authentication security:
+
+**Password Strength Requirements:**
+- Minimum 8 characters
+- At least one uppercase letter
+- At least one lowercase letter
+- At least one number
+- Maximum 128 characters
+- Enforced via Zod validation schema (`passwordSchema`)
+
+**Email Verification Enforcement:**
+- Email verification required before accessing protected routes
+- `ProtectedRoute` component checks `user.email_verified` status
+- Shows `EmailVerificationRequired` page if email not verified
+- Resend verification email functionality
+- OTP verification during registration
+- Email verification status tracked in `useAuth` hook
+
+**Account Lockout Protection:**
+- Tracks failed login attempts per email address
+- Locks account after 5 failed attempts
+- 15-minute lockout duration
+- Automatic unlock after lockout period expires
+- Attempt counter resets after 15 minutes of inactivity
+- Visual warnings showing remaining attempts
+- Lockout status displayed in login form
+- Client-side implementation using localStorage (for production, consider server-side)
+
+**Account Lockout Utility (`src/lib/utils/accountLockout.ts`):**
+- `recordFailedAttempt()`: Records failed login and checks for lockout
+- `clearLockout()`: Clears lockout on successful login
+- `isAccountLocked()`: Checks if account is currently locked
+- `getRemainingAttempts()`: Gets remaining attempts before lockout
+- `formatLockoutTime()`: Formats remaining lockout time as human-readable string
+
+**Security Implementation:**
+- All password inputs use `passwordSchema` validation
+- Email verification enforced at route level
+- Account lockout prevents brute force attacks
+- Failed attempt tracking per email address
+- User-friendly error messages and warnings
+
+### Global Error Handling
+The application implements comprehensive error handling:
+
+**Error Boundary Component (`src/components/error/ErrorBoundary.tsx`):**
+- Catches React component errors and prevents app crashes
+- Displays user-friendly error page with recovery options
+- Shows detailed error information in development mode
+- Provides "Try Again", "Reload Page", and "Go to Home" options
+- Logs errors automatically
+
+**Error Handler Utility (`src/lib/utils/errorHandler.ts`):**
+- Standardizes error types (NETWORK, SUPABASE, VALIDATION, AUTHENTICATION, AUTHORIZATION, UNKNOWN)
+- Normalizes errors to consistent `AppError` interface
+- Maps Supabase error codes to user-friendly messages
+- Handles session errors automatically with refresh logic
+- Provides retryable error detection
+
+**Error Logger (`src/lib/utils/errorLogger.ts`):**
+- Centralized error logging service
+- Stores error context (timestamp, URL, user agent, stack trace)
+- Stores last 10 errors in localStorage for debugging
+- Ready for integration with error tracking services (Sentry, LogRocket)
+- Provides functions for logging warnings and info messages
+
+**Network Error Handler (`src/lib/utils/networkErrorHandler.ts`):**
+- Detects network errors (offline, timeout, connection failures)
+- Implements automatic retry logic with exponential backoff
+- Monitors online/offline status
+- Provides network status event listeners
+
+**Error Handling Hook (`src/hooks/useErrorHandler.ts`):**
+- React hook for consistent error handling across components
+- Integrates with toast notifications
+- Handles automatic redirects for authentication errors
+- Wraps async functions with error handling
+- Provides success/error callbacks
+
+**Error Handling Features:**
+- ✅ Error boundary catches React component errors
+- ✅ Global error handler normalizes all error types
+- ✅ User-friendly error messages for all error types
+- ✅ Automatic session error handling and refresh
+- ✅ Network error detection and retry logic
+- ✅ Supabase error code mapping to user messages
+- ✅ Error logging with context information
+- ✅ Development mode shows detailed error information
+- ✅ Production mode shows user-friendly messages only
+
+**Usage Example:**
+```typescript
+import { useErrorHandler } from '@/hooks/useErrorHandler';
+
+const MyComponent = () => {
+  const { withErrorHandling } = useErrorHandler();
+
+  const handleAction = async () => {
+    const { data, error, success } = await withErrorHandling(
+      async () => {
+        const { data, error } = await supabase.from('table').select('*');
+        if (error) throw error;
+        return data;
+      },
+      {
+        showToast: true,
+        toastTitle: 'Error',
+        successMessage: 'Action completed successfully',
+      }
+    );
+
+    if (success && data) {
+      // Handle success
+    }
+  };
+};
 ```
 
 ## 📚 Additional Resources

@@ -187,24 +187,24 @@ This roadmap outlines all tasks needed to make the application fully functional.
   - ✅ Works with Cursor Cloud and other cloud IDEs
   - ✅ Can be scoped per repository, user, or organization
 
-- [ ] **Input Validation**
-  - [ ] Add client-side validation for all forms
-  - [ ] Implement Zod schemas for form validation
-  - [ ] Add server-side validation in Edge Functions
-  - [ ] Sanitize user inputs
-  - [ ] Add rate limiting for API calls
+- [x] **Input Validation**
+  - [x] Add client-side validation for all forms
+  - [x] Implement Zod schemas for form validation
+  - [x] Add server-side validation in Edge Functions
+  - [x] Sanitize user inputs
+  - [x] Add rate limiting for API calls
 
-- [ ] **RLS Policy Review**
-  - [ ] Audit all RLS policies
-  - [ ] Test edge cases (users accessing other users' data)
-  - [ ] Ensure admin functions are properly secured
-  - [ ] Add RLS policies for any missing tables
+- [x] **RLS Policy Review**
+  - [x] Audit all RLS policies
+  - [x] Test edge cases (users accessing other users' data)
+  - [x] Ensure admin functions are properly secured
+  - [x] Add RLS policies for any missing tables
 
-- [ ] **Authentication Security**
-  - [ ] Implement password strength requirements
-  - [ ] Add email verification enforcement
-  - [ ] Implement account lockout after failed attempts
-  - [ ] Add 2FA option (optional, future enhancement)
+- [x] **Authentication Security**
+  - [x] Implement password strength requirements
+  - [x] Add email verification enforcement
+  - [x] Implement account lockout after failed attempts
+  - [ ] Add 2FA option (optional, future enhancement - skipped for now)
 
 **Dependencies**: None  
 **Estimated Effort**: 2-3 days
@@ -215,13 +215,13 @@ This roadmap outlines all tasks needed to make the application fully functional.
 **Status**: ⚠️ Partial Implementation
 
 #### Tasks:
-- [ ] **Global Error Handling**
-  - [ ] Create error boundary component
-  - [ ] Implement global error handler
-  - [ ] Add error logging service
-  - [ ] Create user-friendly error messages
-  - [ ] Handle network errors gracefully
-  - [ ] Handle Supabase errors consistently
+- [x] **Global Error Handling**
+  - [x] Create error boundary component
+  - [x] Implement global error handler
+  - [x] Add error logging service
+  - [x] Create user-friendly error messages
+  - [x] Handle network errors gracefully
+  - [x] Handle Supabase errors consistently
 
 - [ ] **Loading States**
   - [ ] Add loading skeletons for all data fetches

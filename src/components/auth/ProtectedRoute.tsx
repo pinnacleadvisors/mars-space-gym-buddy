@@ -2,17 +2,23 @@ import { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
+import EmailVerificationRequired from '@/pages/EmailVerificationRequired';
 
 interface ProtectedRouteProps {
   children: ReactNode;
+  requireEmailVerification?: boolean;
 }
 
 /**
  * ProtectedRoute component
  * Wraps routes that require authentication
  * Redirects to login if user is not authenticated
+ * Shows email verification page if email is not verified (when required)
  */
-export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
+export const ProtectedRoute = ({ 
+  children, 
+  requireEmailVerification = true 
+}: ProtectedRouteProps) => {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -32,6 +38,11 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   // Save the attempted location to redirect back after login
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  // Check email verification if required
+  if (requireEmailVerification && !user.email_verified) {
+    return <EmailVerificationRequired />;
   }
 
   return <>{children}</>;

@@ -4,19 +4,57 @@ This guide explains how to set up environment variables for cloud-based developm
 
 ## Required Environment Variables
 
-### Frontend (Vite) Variables
+### 1. Frontend (Vite) Variables - For Your React App
+**Where to set:** GitHub Codespaces Secrets (for cloud development)
+
 - `VITE_SUPABASE_URL` - Your Supabase project URL
 - `VITE_SUPABASE_ANON_KEY` - Supabase anonymous/public key (safe to expose client-side)
 
-### For Supabase Edge Functions (set in Supabase Dashboard)
+**Why GitHub Codespaces Secrets?**
+- These are used by your React app running in Codespaces/Cursor Cloud
+- Your frontend code needs these to connect to Supabase
+- They're automatically available as environment variables when you run `npm run dev`
+
+---
+
+### 2. Supabase Edge Functions Variables - For Functions Running on Supabase
+**Where to set:** Supabase Dashboard (NOT GitHub Secrets!)
+
 - `SUPABASE_URL` - Supabase project URL
 - `SUPABASE_ANON_KEY` - Public anonymous key
 - `SUPABASE_SERVICE_ROLE_KEY` - Service role key (keep secret!)
 - `STRIPE_SECRET_KEY` - Stripe secret API key (keep secret!)
 
-### For GitHub Actions CI/CD (set as repository secrets)
+**Why Supabase Dashboard, NOT GitHub Secrets?**
+- These Edge Functions run on **Supabase's servers**, not in your Codespace
+- They're deployed to Supabase and execute there
+- You configure them in: **Supabase Dashboard → Project Settings → Edge Functions → Secrets**
+- GitHub Secrets won't help here because the functions don't run in GitHub
+
+**How to set them:**
+1. Go to your Supabase project dashboard
+2. Navigate to: Project Settings → Edge Functions → Secrets
+3. Add each secret there
+4. They'll be available to your Edge Functions via `Deno.env.get("KEY_NAME")`
+
+---
+
+### 3. GitHub Actions CI/CD Variables - For Automated Workflows
+**Where to set:** Repository Secrets (Settings → Secrets and variables → Actions)
+
 - `SUPABASE_ACCESS_TOKEN` - Supabase CLI access token
 - `SUPABASE_PROJECT_ID` - Supabase project ID
+
+**Why Repository Secrets, NOT Codespaces Secrets?**
+- These are used by **GitHub Actions workflows** (like `.github/workflows/github-actions-demo.yml`)
+- GitHub Actions runs in GitHub's CI/CD environment, not in your Codespace
+- Repository Secrets are specifically designed for GitHub Actions
+- They're accessed in workflows via `${{ secrets.SECRET_NAME }}`
+
+**When you'd use them:**
+- When GitHub Actions automatically generates database types
+- When CI/CD pipelines deploy your app
+- When automated tests run in GitHub Actions
 
 ---
 
@@ -56,22 +94,25 @@ The environment variables will be automatically available when you:
 
 ---
 
-## Option 2: Repository Secrets (For CI/CD)
+## Option 2: Repository Secrets (For CI/CD Only)
 
-Repository secrets are primarily for GitHub Actions, but can also be used in Codespaces.
+**⚠️ Important:** Repository Secrets are primarily for GitHub Actions workflows, NOT for development.
 
-### Setting Up Repository Secrets
+### Setting Up Repository Secrets for CI/CD
 
 1. **Go to Repository Settings:**
    - Navigate to: Your repository → Settings → Secrets and variables → Actions
 
-2. **Add Secrets:**
+2. **Add Secrets for GitHub Actions:**
    - Click "New repository secret"
-   - Add: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, etc.
+   - Add: `SUPABASE_ACCESS_TOKEN` (for Supabase CLI in workflows)
+   - Add: `SUPABASE_PROJECT_ID` (for Supabase CLI in workflows)
+   - **Do NOT add `VITE_*` variables here** - use Codespaces Secrets instead!
 
-3. **Use in Codespaces:**
-   - Repository secrets are available in Codespaces if you configure them
-   - You may need to explicitly reference them in your Codespace configuration
+3. **Why separate?**
+   - Repository Secrets are for automated workflows (CI/CD)
+   - Codespaces Secrets are for your development environment
+   - They serve different purposes and run in different environments
 
 ---
 
@@ -139,13 +180,26 @@ To verify your environment variables are set correctly:
 
 ---
 
+## Summary: Where to Put Each Secret
+
+| Secret Type | Where to Set | Used By | Why |
+|------------|--------------|---------|-----|
+| `VITE_SUPABASE_URL` | **GitHub Codespaces Secrets** | Your React app in Codespaces | Frontend needs it to connect to Supabase |
+| `VITE_SUPABASE_ANON_KEY` | **GitHub Codespaces Secrets** | Your React app in Codespaces | Frontend needs it to connect to Supabase |
+| `SUPABASE_URL` (Edge Functions) | **Supabase Dashboard** | Edge Functions on Supabase servers | Functions run on Supabase, not GitHub |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Supabase Dashboard** | Edge Functions on Supabase servers | Functions run on Supabase, not GitHub |
+| `STRIPE_SECRET_KEY` | **Supabase Dashboard** | Edge Functions on Supabase servers | Functions run on Supabase, not GitHub |
+| `SUPABASE_ACCESS_TOKEN` | **Repository Secrets** | GitHub Actions workflows | CI/CD runs in GitHub Actions |
+| `SUPABASE_PROJECT_ID` | **Repository Secrets** | GitHub Actions workflows | CI/CD runs in GitHub Actions |
+
 ## Security Best Practices
 
 1. **Never commit `.env` files** - Already in `.gitignore`
-2. **Use Codespaces Secrets** for cloud development
-3. **Use Repository Secrets** for CI/CD workflows
-4. **Keep service role keys secret** - Never expose `SUPABASE_SERVICE_ROLE_KEY` or `STRIPE_SECRET_KEY` client-side
-5. **Rotate keys regularly** - Update secrets if compromised
+2. **Use Codespaces Secrets** for frontend development (VITE_* variables)
+3. **Use Supabase Dashboard** for Edge Function secrets (they run on Supabase)
+4. **Use Repository Secrets** for CI/CD workflows only
+5. **Keep service role keys secret** - Never expose `SUPABASE_SERVICE_ROLE_KEY` or `STRIPE_SECRET_KEY` client-side
+6. **Rotate keys regularly** - Update secrets if compromised
 
 ---
 

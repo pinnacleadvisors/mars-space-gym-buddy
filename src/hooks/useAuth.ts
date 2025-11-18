@@ -71,6 +71,7 @@ export const useAuth = () => {
         membership_end_date: membership?.end_date || undefined,
         created_at: profile?.created_at || authUser.created_at || new Date().toISOString(),
         updated_at: profile?.updated_at || new Date().toISOString(),
+        email_verified: authUser.email_confirmed_at !== null && authUser.email_confirmed_at !== undefined,
       };
 
       return userData;
