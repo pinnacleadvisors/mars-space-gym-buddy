@@ -49,7 +49,7 @@ mars-space-gym-buddy/
 │   │   ├── ResetPassword.tsx      # Password reset
 │   │   ├── Dashboard.tsx          # User dashboard
 │   │   ├── Classes.tsx            # Class listings (✅ fully implemented with booking, filters, search)
-│   │   ├── Bookings.tsx           # User bookings
+│   │   ├── Bookings.tsx           # User bookings (✅ fully implemented with list/calendar views, cancel functionality)
 │   │   ├── ManageMemberships.tsx  # Membership management
 │   │   ├── QREntry.tsx            # QR code check-in
 │   │   ├── QRExitPage.tsx         # QR code check-out
@@ -577,6 +577,19 @@ The Classes page (`src/pages/Classes.tsx`) includes:
 - **Visual indicators**: Badges show "Full", "Few Spots Left", or "Booked" status
 - **Error handling**: Toast notifications for booking success/failure
 - **Date formatting**: Uses `date-fns` for readable date/time display
+
+### Bookings Page Features
+The Bookings page (`src/pages/Bookings.tsx`) includes:
+- **Real bookings data**: Uses `useBookings` hook to fetch and display user's actual bookings
+- **List and Calendar views**: Toggle between list view and calendar view
+- **Upcoming vs Past tabs**: Separate tabs for upcoming and past bookings
+- **Booking status display**: Shows status badges (Booked, Cancelled, Attended, No Show)
+- **Cancel booking**: Full cancel functionality with 24-hour policy validation
+- **Booking details dialog**: View complete booking information
+- **Date filtering**: Calendar view allows selecting dates to filter bookings
+- **Smart sorting**: Upcoming sorted by earliest first, past sorted by most recent first
+- **Cancel validation**: Only shows cancel button when cancellation is allowed (24+ hours before class)
+- **Error handling**: Toast notifications for all booking operations
 
 ### Supabase Client Usage
 ```typescript

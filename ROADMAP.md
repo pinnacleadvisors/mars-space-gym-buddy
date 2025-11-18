@@ -76,14 +76,14 @@ This roadmap outlines all tasks needed to make the application fully functional.
   - [x] Filter classes by date, category, instructor
   - [x] Add search functionality
 
-- [ ] **Update Bookings Page**
-  - [ ] Replace hardcoded data with real bookings
-  - [ ] Fetch and display user's bookings
-  - [ ] Show booking status (booked, attended, cancelled)
-  - [ ] Implement cancel booking functionality
-  - [ ] Add booking details view
-  - [ ] Show upcoming vs past bookings
-  - [ ] Add calendar view option
+- [x] **Update Bookings Page**
+  - [x] Replace hardcoded data with real bookings
+  - [x] Fetch and display user's bookings
+  - [x] Show booking status (booked, attended, cancelled)
+  - [x] Implement cancel booking functionality
+  - [x] Add booking details view
+  - [x] Show upcoming vs past bookings
+  - [x] Add calendar view option
 
 **Dependencies**: Authentication system, Database schema (already exists)  
 **Estimated Effort**: 3-4 days
