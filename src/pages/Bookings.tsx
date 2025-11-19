@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Calendar as CalendarIcon, Clock, Users, MapPin, Loader2, X, CalendarDays, List } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { toastMessages, showErrorToast } from "@/lib/utils/toastHelpers";
 import { useBookings, BookingWithDetails } from "@/hooks/useBookings";
 import { format, parseISO, isAfter, isBefore, startOfToday, isSameDay } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
@@ -114,23 +115,15 @@ const Bookings = () => {
       const result = await cancelBooking(selectedBooking.id);
 
       if (result.success) {
-        toast({
-          title: "Booking Cancelled",
-          description: "Your booking has been successfully cancelled.",
-        });
+        toast(toastMessages.bookingCancelled());
         setShowCancelDialog(false);
         setSelectedBooking(null);
         await refreshBookings();
       } else {
-        toast({
-          variant: "destructive",
-          title: "Cancellation Failed",
-          description: result.error || "Failed to cancel booking. Please try again.",
-        });
+        toast(toastMessages.cancellationFailed(result.error));
       }
     } catch (error: any) {
-      toast({
-        variant: "destructive",
+      showErrorToast({
         title: "Error",
         description: error.message || "An error occurred while cancelling the booking.",
       });

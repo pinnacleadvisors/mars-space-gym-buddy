@@ -26,6 +26,7 @@ import {
 import { Clock, Users, Loader2, Search, Calendar, User, Filter } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { toastMessages, showErrorToast } from "@/lib/utils/toastHelpers";
 import { useBookings } from "@/hooks/useBookings";
 import { format, parseISO, isAfter, isBefore, startOfToday } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -81,8 +82,7 @@ const Classes = () => {
       if (error) throw error;
       setSessions(data || []);
     } catch (error: any) {
-      toast({
-        variant: "destructive",
+      showErrorToast({
         title: "Error",
         description: error.message || "Failed to fetch classes",
       });
@@ -166,26 +166,17 @@ const Classes = () => {
 
   const handleBookClick = (session: ClassSessionWithAvailability) => {
     if (session.isBooked) {
-      toast({
-        variant: "default",
-        title: "Already Booked",
-        description: "You already have a booking for this class.",
-      });
+      toast(toastMessages.alreadyBooked());
       return;
     }
 
     if (session.availableSpots === 0) {
-      toast({
-        variant: "destructive",
-        title: "Class Full",
-        description: "This class is fully booked. Please try another session.",
-      });
+      toast(toastMessages.classFull());
       return;
     }
 
     if (session.isPast) {
-      toast({
-        variant: "destructive",
+      showErrorToast({
         title: "Cannot Book",
         description: "This class has already started.",
       });
@@ -204,19 +195,12 @@ const Classes = () => {
       const result = await createBooking(selectedSession.id);
       
       if (result.success) {
-        toast({
-          title: "Booking Confirmed!",
-          description: `You've successfully booked ${selectedSession.name}.`,
-        });
+        toast(toastMessages.bookingCreated(selectedSession.name));
         setShowBookingDialog(false);
         setSelectedSession(null);
         await refreshBookings();
       } else {
-        toast({
-          variant: "destructive",
-          title: "Booking Failed",
-          description: result.error || "Failed to book class. Please try again.",
-        });
+        toast(toastMessages.bookingFailed(result.error));
       }
     } catch (error: any) {
       toast({

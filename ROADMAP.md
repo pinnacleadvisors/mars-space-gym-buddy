@@ -229,11 +229,11 @@ This roadmap outlines all tasks needed to make the application fully functional.
   - [x] Add progress indicators for long operations
   - [x] Show loading states during navigation
 
-- [ ] **Toast Notifications**
-  - [ ] Standardize toast usage across app
-  - [ ] Add success/error/info variants consistently
-  - [ ] Implement toast queue management
-  - [ ] Add auto-dismiss timers
+- [x] **Toast Notifications**
+  - [x] Standardize toast usage across app
+  - [x] Add success/error/info variants consistently
+  - [x] Implement toast queue management
+  - [x] Add auto-dismiss timers
 
 - [ ] **Form Validation Feedback**
   - [ ] Show inline validation errors

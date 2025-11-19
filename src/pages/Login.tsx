@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Dumbbell, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { toastMessages, showInfoToast } from "@/lib/utils/toastHelpers";
 import { Separator } from "@/components/ui/separator";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -104,11 +105,7 @@ const Login = () => {
         // Check if account is now locked
         if (lockoutResult.isLocked && lockoutResult.lockedUntil) {
           const timeRemaining = formatLockoutTime(lockoutResult.lockedUntil - Date.now());
-          toast({
-            variant: "destructive",
-            title: "Account Locked",
-            description: `Too many failed login attempts. Please try again in ${timeRemaining}.`,
-          });
+          toast(toastMessages.accountLocked(timeRemaining));
           throw error;
         }
 
@@ -137,17 +134,10 @@ const Login = () => {
       // Check if email is verified
       const { data: { user } } = await supabase.auth.getUser();
       if (user && !user.email_confirmed_at) {
-        toast({
-          variant: "default",
-          title: "Email verification required",
-          description: "Please verify your email address to access all features.",
-        });
+        toast(toastMessages.emailVerificationRequired());
       }
 
-      toast({
-        title: "Welcome back!",
-        description: "You have successfully logged in.",
-      });
+      toast(toastMessages.loginSuccess());
       navigate("/dashboard");
     } catch (error: any) {
       // Error already handled above

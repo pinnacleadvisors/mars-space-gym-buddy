@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { Dumbbell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { toastMessages, showErrorToast } from "@/lib/utils/toastHelpers";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
@@ -45,8 +46,7 @@ const ResetPassword = () => {
     e.preventDefault();
 
     if (newPassword !== confirmPassword) {
-      toast({
-        variant: "destructive",
+      showErrorToast({
         title: "Passwords don't match",
         description: "Please make sure both passwords are the same.",
       });
@@ -86,14 +86,10 @@ const ResetPassword = () => {
         if (updateError) throw updateError;
       }
 
-      toast({
-        title: "Password updated!",
-        description: "Your password has been successfully reset.",
-      });
+      toast(toastMessages.passwordReset());
       navigate("/login");
     } catch (error: any) {
-      toast({
-        variant: "destructive",
+      showErrorToast({
         title: "Password reset failed",
         description: error.message,
       });

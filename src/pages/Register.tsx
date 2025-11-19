@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Dumbbell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { toastMessages, showErrorToast, showInfoToast } from "@/lib/utils/toastHelpers";
 import { Separator } from "@/components/ui/separator";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useState } from "react";
@@ -61,13 +62,12 @@ const Register = () => {
 
       setEmail(sanitizedEmail);
       setShowOTP(true);
-      toast({
+      showInfoToast({
         title: "Verification code sent",
         description: "Please check your email for the verification code.",
       });
     } catch (error: any) {
-      toast({
-        variant: "destructive",
+      showErrorToast({
         title: "Registration failed",
         description: error.message,
       });
@@ -89,14 +89,10 @@ const Register = () => {
 
       if (error) throw error;
 
-      toast({
-        title: "Email verified!",
-        description: "Your account has been created successfully.",
-      });
+      toast(toastMessages.registrationSuccess());
       navigate("/dashboard");
     } catch (error: any) {
-      toast({
-        variant: "destructive",
+      showErrorToast({
         title: "Verification failed",
         description: error.message,
       });
@@ -114,8 +110,7 @@ const Register = () => {
     });
 
     if (error) {
-      toast({
-        variant: "destructive",
+      showErrorToast({
         title: "Authentication Error",
         description: error.message,
       });

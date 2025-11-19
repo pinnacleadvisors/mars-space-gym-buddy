@@ -58,7 +58,8 @@ mars-space-gym-buddy/
 │   │       ├── accountLockout.ts  # Account lockout tracking utilities
 │   │       ├── errorLogger.ts     # Error logging utility
 │   │       ├── errorHandler.ts    # Global error handling utility
-│   │       └── networkErrorHandler.ts # Network error handling utility
+│   │       ├── networkErrorHandler.ts # Network error handling utility
+│   │       └── toastHelpers.ts    # Toast notification helpers
 │   ├── lib/
 │   │   └── validations/          # Zod validation schemas
 │   │       ├── auth.ts            # Authentication form schemas
@@ -1003,6 +1004,90 @@ import { ProgressIndicator } from '@/components/loading/ProgressIndicator';
 - ✅ Admin Analytics: Chart and metric card skeletons
 - ✅ All protected routes: Navigation loading indicator
 - ✅ All forms: Button loading states during submission
+
+### Toast Notifications
+The application implements standardized toast notifications with queue management and auto-dismiss:
+
+**Toast Variants:**
+- `default`: Standard toast with default styling
+- `destructive`: Error toast with red styling (7 second duration)
+- `success`: Success toast with green styling (3 second duration)
+- `info`: Info toast with primary color styling (5 second duration)
+
+**Toast Configuration:**
+- Maximum 5 toasts displayed at once (queue management)
+- Auto-dismiss timers based on variant:
+  - Success: 3 seconds
+  - Error: 7 seconds
+  - Info: 5 seconds
+  - Default: 5 seconds
+- Custom duration can be specified per toast
+- Toast removal delay: 1 second after dismiss
+
+**Toast Helper Functions (`src/lib/utils/toastHelpers.ts`):**
+- `showSuccessToast()`: Shows success toast with green styling
+- `showErrorToast()`: Shows error toast with red styling
+- `showInfoToast()`: Shows info toast with primary styling
+- `showToast()`: Shows default toast
+- `toastMessages`: Pre-defined toast messages for common actions
+
+**Standardized Toast Messages:**
+- `bookingCreated()`: Booking confirmation message
+- `bookingCancelled()`: Booking cancellation confirmation
+- `bookingFailed()`: Booking error message
+- `loginSuccess()`: Login success message
+- `registrationSuccess()`: Registration success message
+- `passwordReset()`: Password reset success message
+- `accountLocked()`: Account lockout message
+- `emailVerificationRequired()`: Email verification reminder
+- `classFull()`: Class full error message
+- `alreadyBooked()`: Already booked info message
+- And more...
+
+**Toast Queue Management:**
+- Maximum 5 toasts in queue
+- New toasts push old ones out when limit reached
+- Automatic cleanup of dismissed toasts
+- Prevents toast overflow and UI clutter
+
+**Auto-Dismiss Timers:**
+- All toasts auto-dismiss based on variant
+- Timers cleared when toast is manually dismissed
+- Duration can be customized per toast
+- Prevents toasts from staying indefinitely
+
+**Usage Examples:**
+```typescript
+// Using helper functions
+import { showSuccessToast, showErrorToast, showInfoToast } from '@/lib/utils/toastHelpers';
+
+showSuccessToast("Operation completed successfully!");
+showErrorToast("Something went wrong");
+showInfoToast("Please check your email");
+
+// Using pre-defined messages
+import { toastMessages } from '@/lib/utils/toastHelpers';
+import { toast } from '@/hooks/use-toast';
+
+toast(toastMessages.bookingCreated("Yoga Class"));
+toast(toastMessages.loginSuccess());
+
+// Custom toast with duration
+toast({
+  variant: "success",
+  title: "Custom Success",
+  description: "This will dismiss in 5 seconds",
+  duration: 5000,
+});
+```
+
+**Pages Using Standardized Toasts:**
+- ✅ Classes page: Booking success/error messages
+- ✅ Bookings page: Cancellation success/error messages
+- ✅ Login page: Login success/error, account locked messages
+- ✅ Register page: Registration success/error, verification messages
+- ✅ Reset Password page: Password reset success/error messages
+- ✅ All error handling: Uses standardized error toasts
 
 ## 📚 Additional Resources
 
