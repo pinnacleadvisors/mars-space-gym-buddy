@@ -86,7 +86,7 @@ mars-space-gym-buddy/
 │   │   ├── AdminDashboard.tsx     # Admin dashboard
 │   │   ├── AdminUsers.tsx         # User management (✅ fully implemented with search, filtering, bulk actions, role management, activity history)
 │   │   ├── AdminAnalytics.tsx     # Analytics dashboard (✅ fully implemented with charts, date filtering, export)
-│   │   ├── AdminManageClasses.tsx # Class management (✅ includes session creation from templates)
+│   │   ├── AdminManageClasses.tsx # Class management (✅ fully implemented with improved UI, bulk creation, capacity management, instructor management)
 │   │   ├── AdminManageMemberships.tsx # Membership management (✅ fully implemented with plan creation/editing, statistics, renewal reminders)
 │   │   ├── AdminUserMemberships.tsx   # User membership management
 │   │   └── NotFound.tsx           # 404 page
@@ -784,15 +784,50 @@ The AdminManageMemberships page (`src/pages/AdminManageMemberships.tsx`) include
 
 **Note**: Membership assignment to users is handled via the AdminUserMemberships page (`/admin/usermemberships`), which provides full CRUD functionality for user memberships.
 
-### Class Sessions Management
+### Admin Class Management Features
 The AdminManageClasses page (`src/pages/AdminManageClasses.tsx`) includes:
-- **Link classes to sessions**: Database migration adds `class_id` column to `class_sessions` table
-- **Create sessions from templates**: Admins can create sessions from class templates with one click
-- **Recurring session creation**: Create multiple sessions at once (daily, weekly, monthly)
-- **Session scheduling UI**: Full dialog with date picker, time inputs, and capacity settings
-- **Smart defaults**: Pre-fills session details from class template (name, instructor, capacity, duration)
-- **Bulk creation**: Can create up to 52 recurring sessions at once
+- **Class Creation/Editing**:
+  - Create and edit class templates with comprehensive form validation
+  - Fields: name, description, instructor, category, duration, capacity, image URL, active status
+  - Form validation using Zod schemas with helpful error messages
+  - Delete classes (with confirmation)
+- **Improved Class Session Creation UI**:
+  - Enhanced dialog with better layout and organization
+  - Form validation using react-hook-form and Zod
+  - Date picker for start date selection
+  - Time inputs for start and end times
+  - Capacity input with validation
+  - Recurring session toggle with expanded options
+- **Bulk Session Creation**:
+  - Create multiple sessions at once with recurring options
+  - Daily, weekly, or monthly recurrence patterns
+  - Configurable number of sessions (1-52)
+  - Pre-fills session details from class template (name, instructor, capacity)
+  - Smart end time calculation based on duration
+- **Class Capacity Management**:
+  - View all sessions with capacity information
+  - See booked vs available spots for each session
+  - Edit session capacity individually
+  - Visual indicators for capacity status (color-coded badges)
+  - Real-time booking counts from `class_bookings` table
+  - Capacity update dialog with current status display
+- **Instructor Management**:
+  - View all instructors with statistics
+  - Shows number of classes per instructor
+  - Shows number of sessions per instructor
+  - Instructor cards with visual statistics
+  - Automatically extracted from classes and sessions
+- **Search and Filtering**:
+  - Search classes by name, instructor, or category
+  - Filter by category
+  - Filter by instructor
+  - Real-time filtering as you type
+- **Tabbed Interface**: Organized into Classes, Sessions, and Instructors tabs
 - **Database relationship**: Sessions linked to classes via `class_id` foreign key (nullable for standalone sessions)
+- **Real-time Data**: Fetches latest classes, sessions, bookings, and instructor data
+- **Loading States**: Loading spinner during data fetch
+- **Error Handling**: Toast notifications for all operations
+- **Form Validation**: Comprehensive validation with helpful error messages
 
 ### Class Session Booking Logic
 The booking system (`useBookings` hook and Classes page) correctly uses `class_sessions`:

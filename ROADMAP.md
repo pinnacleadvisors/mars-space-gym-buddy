@@ -317,11 +317,11 @@ This roadmap outlines all tasks needed to make the application fully functional.
   - [x] Show membership statistics
   - [x] Add membership renewal reminders
 
-- [ ] **Class Management**
-  - [ ] Improve class session creation UI
-  - [ ] Add bulk session creation
-  - [ ] Implement class capacity management
-  - [ ] Add instructor management
+- [x] **Class Management**
+  - [x] Improve class session creation UI
+  - [x] Add bulk session creation
+  - [x] Implement class capacity management
+  - [x] Add instructor management
 
 **Dependencies**: Admin authentication  
 **Estimated Effort**: 3-4 days

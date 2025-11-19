@@ -1,4 +1,6 @@
-import { useState, useEffect } from "react";
+"use client";
+
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,12 +11,70 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Plus, Pencil, Trash2, Loader2, CalendarIcon, Repeat } from "lucide-react";
+import { 
+  Plus, 
+  Pencil, 
+  Trash2, 
+  Loader2, 
+  CalendarIcon, 
+  Repeat, 
+  Users, 
+  UserPlus,
+  BarChart3,
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
+  Edit,
+  Search,
+  Filter
+} from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format, addDays, addWeeks, addMonths, startOfWeek, nextDay } from "date-fns";
+import { format, addDays, addWeeks, addMonths, startOfWeek, nextDay, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LoadingSpinner } from "@/components/loading/LoadingSpinner";
+import { showErrorToast, showSuccessToast } from "@/lib/utils/toastHelpers";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+
+// Form validation schemas
+const classSchema = z.object({
+  name: z.string().min(1, "Name is required").max(100, "Name is too long"),
+  description: z.string().optional(),
+  instructor: z.string().min(1, "Instructor is required").max(100, "Instructor name is too long"),
+  schedule: z.string().optional(),
+  duration: z.number().min(1, "Duration must be at least 1 minute").max(480, "Duration cannot exceed 8 hours"),
+  capacity: z.number().min(1, "Capacity must be at least 1").max(1000, "Capacity cannot exceed 1000"),
+  category: z.string().optional(),
+  image_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  is_active: z.boolean(),
+});
+
+const sessionSchema = z.object({
+  startDate: z.date({ required_error: "Start date is required" }),
+  startTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format"),
+  endTime: z.string().regex(/^([0-1][0-9]|2[0-3]):[0-5][0-9]$/, "Invalid time format"),
+  capacity: z.number().min(1, "Capacity must be at least 1").max(1000, "Capacity cannot exceed 1000"),
+  recurring: z.boolean(),
+  recurringType: z.enum(["daily", "weekly", "monthly"]),
+  recurringCount: z.number().min(1, "Must create at least 1 session").max(52, "Cannot create more than 52 sessions"),
+});
+
+type ClassFormData = z.infer<typeof classSchema>;
+type SessionFormData = z.infer<typeof sessionSchema>;
 
 interface Class {
   id: string;
@@ -27,46 +87,93 @@ interface Class {
   category: string | null;
   image_url: string | null;
   is_active: boolean;
+  created_at?: string;
+}
+
+interface ClassSession {
+  id: string;
+  class_id: string | null;
+  name: string;
+  instructor: string | null;
+  start_time: string;
+  end_time: string;
+  capacity: number | null;
+  created_at: string;
+  classes?: {
+    name: string;
+  };
+}
+
+interface SessionCapacity {
+  session_id: string;
+  capacity: number;
+  booked: number;
+  available: number;
+}
+
+interface Instructor {
+  name: string;
+  class_count: number;
+  session_count: number;
 }
 
 const AdminManageClasses = () => {
-  // Auth check is handled by AdminRoute wrapper
   const { toast } = useToast();
   const [classes, setClasses] = useState<Class[]>([]);
+  const [sessions, setSessions] = useState<ClassSession[]>([]);
+  const [sessionCapacities, setSessionCapacities] = useState<Map<string, SessionCapacity>>(new Map());
+  const [instructors, setInstructors] = useState<Instructor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
+  const [capacityDialogOpen, setCapacityDialogOpen] = useState(false);
+  const [instructorDialogOpen, setInstructorDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
+  const [editingSession, setEditingSession] = useState<ClassSession | null>(null);
   const [selectedClassForSession, setSelectedClassForSession] = useState<Class | null>(null);
-  const [scheduleDate, setScheduleDate] = useState<Date>();
-  const [scheduleTime, setScheduleTime] = useState<string>("09:00");
-  const [sessionFormData, setSessionFormData] = useState({
-    startDate: undefined as Date | undefined,
-    startTime: "09:00",
-    endTime: "10:00",
-    capacity: 20,
-    recurring: false,
-    recurringType: "weekly" as "daily" | "weekly" | "monthly",
-    recurringCount: 4,
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [instructorFilter, setInstructorFilter] = useState<string>("all");
+  const [activeTab, setActiveTab] = useState<"classes" | "sessions" | "instructors">("classes");
+
+  const classForm = useForm<ClassFormData>({
+    resolver: zodResolver(classSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      instructor: "",
+      schedule: "",
+      duration: 60,
+      capacity: 20,
+      category: "",
+      image_url: "",
+      is_active: true,
+    },
   });
-  const [formData, setFormData] = useState({
-    name: "",
-    description: "",
-    instructor: "",
-    schedule: "",
-    duration: 60,
-    capacity: 20,
-    category: "",
-    image_url: "",
-    is_active: true,
+
+  const sessionForm = useForm<SessionFormData>({
+    resolver: zodResolver(sessionSchema),
+    defaultValues: {
+      startDate: new Date(),
+      startTime: "09:00",
+      endTime: "10:00",
+      capacity: 20,
+      recurring: false,
+      recurringType: "weekly",
+      recurringCount: 4,
+    },
   });
 
   useEffect(() => {
     fetchClasses();
+    fetchSessions();
+    fetchInstructors();
   }, []);
 
   const fetchClasses = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from("classes")
         .select("*")
@@ -75,9 +182,8 @@ const AdminManageClasses = () => {
       if (error) throw error;
       setClasses(data || []);
     } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
+      showErrorToast({
+        title: "Error loading classes",
         description: error.message,
       });
     } finally {
@@ -85,51 +191,143 @@ const AdminManageClasses = () => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const fetchSessions = async () => {
+    try {
+      setSessionsLoading(true);
+      const { data, error } = await supabase
+        .from("class_sessions")
+        .select("*, classes(name)")
+        .order("start_time", { ascending: false })
+        .limit(100); // Limit to recent 100 sessions
 
-    // Combine date and time into schedule string
-    const scheduleValue = scheduleDate && scheduleTime
-      ? `${format(scheduleDate, "yyyy-MM-dd")} ${scheduleTime}`
-      : formData.schedule;
+      if (error) throw error;
+      setSessions(data || []);
 
-    const submitData = {
-      ...formData,
-      schedule: scheduleValue,
-    };
+      // Fetch booking counts for each session
+      if (data && data.length > 0) {
+        const sessionIds = data.map((s) => s.id);
+        const { data: bookings, error: bookingsError } = await supabase
+          .from("class_bookings")
+          .select("class_id, status")
+          .in("class_id", sessionIds)
+          .neq("status", "cancelled");
 
+        if (!bookingsError && bookings) {
+          const capacityMap = new Map<string, SessionCapacity>();
+          data.forEach((session) => {
+            const booked = bookings.filter((b) => b.class_id === session.id).length;
+            const capacity = session.capacity || 0;
+            capacityMap.set(session.id, {
+              session_id: session.id,
+              capacity,
+              booked,
+              available: Math.max(0, capacity - booked),
+            });
+          });
+          setSessionCapacities(capacityMap);
+        }
+      }
+    } catch (error: any) {
+      showErrorToast({
+        title: "Error loading sessions",
+        description: error.message,
+      });
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const fetchInstructors = async () => {
+    try {
+      // Get unique instructors from classes
+      const { data: classesData, error: classesError } = await supabase
+        .from("classes")
+        .select("instructor");
+
+      if (classesError) throw classesError;
+
+      // Get unique instructors from sessions
+      const { data: sessionsData, error: sessionsError } = await supabase
+        .from("class_sessions")
+        .select("instructor");
+
+      if (sessionsError) throw sessionsError;
+
+      // Combine and count
+      const instructorMap = new Map<string, { class_count: number; session_count: number }>();
+      
+      classesData?.forEach((c) => {
+        if (c.instructor) {
+          const existing = instructorMap.get(c.instructor) || { class_count: 0, session_count: 0 };
+          instructorMap.set(c.instructor, { ...existing, class_count: existing.class_count + 1 });
+        }
+      });
+
+      sessionsData?.forEach((s) => {
+        if (s.instructor) {
+          const existing = instructorMap.get(s.instructor) || { class_count: 0, session_count: 0 };
+          instructorMap.set(s.instructor, { ...existing, session_count: existing.session_count + 1 });
+        }
+      });
+
+      const instructorList: Instructor[] = Array.from(instructorMap.entries()).map(([name, counts]) => ({
+        name,
+        ...counts,
+      }));
+
+      setInstructors(instructorList.sort((a, b) => a.name.localeCompare(b.name)));
+    } catch (error: any) {
+      console.error("Error fetching instructors:", error);
+    }
+  };
+
+  const filteredClasses = useMemo(() => {
+    return classes.filter((classItem) => {
+      const matchesSearch =
+        searchQuery === "" ||
+        classItem.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        classItem.instructor.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        classItem.category?.toLowerCase().includes(searchQuery.toLowerCase());
+
+      const matchesCategory = categoryFilter === "all" || classItem.category === categoryFilter;
+      const matchesInstructor = instructorFilter === "all" || classItem.instructor === instructorFilter;
+
+      return matchesSearch && matchesCategory && matchesInstructor;
+    });
+  }, [classes, searchQuery, categoryFilter, instructorFilter]);
+
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    classes.forEach((c) => {
+      if (c.category) cats.add(c.category);
+    });
+    return Array.from(cats).sort();
+  }, [classes]);
+
+  const handleClassSubmit = async (data: ClassFormData) => {
     try {
       if (editingClass) {
         const { error } = await supabase
           .from("classes")
-          .update(submitData)
+          .update(data)
           .eq("id", editingClass.id);
 
         if (error) throw error;
-
-        toast({
-          title: "Success",
-          description: "Class updated successfully",
-        });
+        showSuccessToast("Class updated successfully");
       } else {
-        const { error } = await supabase
-          .from("classes")
-          .insert([submitData]);
+        const { error } = await supabase.from("classes").insert([data]);
 
         if (error) throw error;
-
-        toast({
-          title: "Success",
-          description: "Class created successfully",
-        });
+        showSuccessToast("Class created successfully");
       }
 
       setDialogOpen(false);
-      resetForm();
-      fetchClasses();
+      classForm.reset();
+      setEditingClass(null);
+      await fetchClasses();
+      await fetchInstructors();
     } catch (error: any) {
-      toast({
-        variant: "destructive",
+      showErrorToast({
         title: "Error",
         description: error.message,
       });
@@ -137,24 +335,17 @@ const AdminManageClasses = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this class?")) return;
+    if (!confirm("Are you sure you want to delete this class? This will not delete associated sessions.")) return;
 
     try {
-      const { error } = await supabase
-        .from("classes")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from("classes").delete().eq("id", id);
 
       if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Class deleted successfully",
-      });
-      fetchClasses();
+      showSuccessToast("Class deleted successfully");
+      await fetchClasses();
+      await fetchInstructors();
     } catch (error: any) {
-      toast({
-        variant: "destructive",
+      showErrorToast({
         title: "Error",
         description: error.message,
       });
@@ -163,21 +354,7 @@ const AdminManageClasses = () => {
 
   const handleEdit = (classItem: Class) => {
     setEditingClass(classItem);
-    
-    // Parse existing schedule if it's in datetime format
-    try {
-      const [datePart, timePart] = classItem.schedule.split(' ');
-      if (datePart && timePart) {
-        setScheduleDate(new Date(datePart));
-        setScheduleTime(timePart);
-      }
-    } catch (e) {
-      // If parsing fails, leave date/time empty
-      setScheduleDate(undefined);
-      setScheduleTime("09:00");
-    }
-    
-    setFormData({
+    classForm.reset({
       name: classItem.name,
       description: classItem.description || "",
       instructor: classItem.instructor,
@@ -191,44 +368,18 @@ const AdminManageClasses = () => {
     setDialogOpen(true);
   };
 
-  const resetForm = () => {
-    setEditingClass(null);
-    setScheduleDate(undefined);
-    setScheduleTime("09:00");
-    setFormData({
-      name: "",
-      description: "",
-      instructor: "",
-      schedule: "",
-      duration: 60,
-      capacity: 20,
-      category: "",
-      image_url: "",
-      is_active: true,
-    });
-  };
-
-  const handleDialogClose = (open: boolean) => {
-    setDialogOpen(open);
-    if (!open) {
-      resetForm();
-    }
-  };
-
   const handleCreateSession = (classItem: Class) => {
     setSelectedClassForSession(classItem);
-    // Calculate end time based on duration
-    const startHour = 9;
-    const startMinute = 0;
     const duration = classItem.duration || 60;
-    const endDate = new Date();
-    endDate.setHours(startHour, startMinute + duration, 0);
-    const endTime = format(endDate, "HH:mm");
+    const startDate = new Date();
+    startDate.setHours(9, 0, 0);
+    const endDate = new Date(startDate);
+    endDate.setMinutes(endDate.getMinutes() + duration);
     
-    setSessionFormData({
-      startDate: new Date(),
+    sessionForm.reset({
+      startDate,
       startTime: "09:00",
-      endTime: endTime,
+      endTime: format(endDate, "HH:mm"),
       capacity: classItem.capacity,
       recurring: false,
       recurringType: "weekly",
@@ -237,125 +388,127 @@ const AdminManageClasses = () => {
     setSessionDialogOpen(true);
   };
 
-  const handleCreateSessionSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedClassForSession || !sessionFormData.startDate) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please select a start date",
-      });
-      return;
-    }
+  const handleSessionSubmit = async (data: SessionFormData) => {
+    if (!selectedClassForSession) return;
 
     try {
       const sessionsToCreate = [];
-      
-      if (sessionFormData.recurring) {
-        // Create recurring sessions
-        let currentDate = new Date(sessionFormData.startDate);
-        const startTimeParts = sessionFormData.startTime.split(":");
-        const endTimeParts = sessionFormData.endTime.split(":");
-        
-        for (let i = 0; i < sessionFormData.recurringCount; i++) {
+
+      if (data.recurring) {
+        let currentDate = new Date(data.startDate);
+        const startTimeParts = data.startTime.split(":");
+        const endTimeParts = data.endTime.split(":");
+
+        for (let i = 0; i < data.recurringCount; i++) {
           const sessionStart = new Date(currentDate);
           sessionStart.setHours(parseInt(startTimeParts[0]), parseInt(startTimeParts[1]), 0);
-          
+
           const sessionEnd = new Date(currentDate);
           sessionEnd.setHours(parseInt(endTimeParts[0]), parseInt(endTimeParts[1]), 0);
-          
+
           sessionsToCreate.push({
             class_id: selectedClassForSession.id,
             name: selectedClassForSession.name,
             instructor: selectedClassForSession.instructor,
             start_time: sessionStart.toISOString(),
             end_time: sessionEnd.toISOString(),
-            capacity: sessionFormData.capacity,
+            capacity: data.capacity,
           });
 
-          // Calculate next date based on recurring type
-          if (sessionFormData.recurringType === "daily") {
+          if (data.recurringType === "daily") {
             currentDate = addDays(currentDate, 1);
-          } else if (sessionFormData.recurringType === "weekly") {
+          } else if (data.recurringType === "weekly") {
             currentDate = addWeeks(currentDate, 1);
-          } else if (sessionFormData.recurringType === "monthly") {
+          } else if (data.recurringType === "monthly") {
             currentDate = addMonths(currentDate, 1);
           }
         }
       } else {
-        // Create single session
-        const startTimeParts = sessionFormData.startTime.split(":");
-        const endTimeParts = sessionFormData.endTime.split(":");
-        
-        const sessionStart = new Date(sessionFormData.startDate);
+        const startTimeParts = data.startTime.split(":");
+        const endTimeParts = data.endTime.split(":");
+
+        const sessionStart = new Date(data.startDate);
         sessionStart.setHours(parseInt(startTimeParts[0]), parseInt(startTimeParts[1]), 0);
-        
-        const sessionEnd = new Date(sessionFormData.startDate);
+
+        const sessionEnd = new Date(data.startDate);
         sessionEnd.setHours(parseInt(endTimeParts[0]), parseInt(endTimeParts[1]), 0);
-        
+
         sessionsToCreate.push({
           class_id: selectedClassForSession.id,
           name: selectedClassForSession.name,
           instructor: selectedClassForSession.instructor,
           start_time: sessionStart.toISOString(),
           end_time: sessionEnd.toISOString(),
-          capacity: sessionFormData.capacity,
+          capacity: data.capacity,
         });
       }
 
-      const { error } = await supabase
-        .from("class_sessions")
-        .insert(sessionsToCreate);
+      const { error } = await supabase.from("class_sessions").insert(sessionsToCreate);
 
       if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: `Created ${sessionsToCreate.length} session(s) successfully`,
-      });
-
+      showSuccessToast(`Created ${sessionsToCreate.length} session(s) successfully`);
       setSessionDialogOpen(false);
       setSelectedClassForSession(null);
-      resetSessionForm();
+      sessionForm.reset();
+      await fetchSessions();
+      await fetchInstructors();
     } catch (error: any) {
-      toast({
-        variant: "destructive",
+      showErrorToast({
         title: "Error",
         description: error.message || "Failed to create session(s)",
       });
     }
   };
 
-  const resetSessionForm = () => {
-    setSessionFormData({
-      startDate: undefined,
-      startTime: "09:00",
-      endTime: "10:00",
-      capacity: 20,
-      recurring: false,
-      recurringType: "weekly",
-      recurringCount: 4,
-    });
+  const handleUpdateSessionCapacity = async (sessionId: string, newCapacity: number) => {
+    try {
+      const { error } = await supabase
+        .from("class_sessions")
+        .update({ capacity: newCapacity })
+        .eq("id", sessionId);
+
+      if (error) throw error;
+
+      showSuccessToast("Session capacity updated successfully");
+      setCapacityDialogOpen(false);
+      setEditingSession(null);
+      await fetchSessions();
+    } catch (error: any) {
+      showErrorToast({
+        title: "Error",
+        description: error.message,
+      });
+    }
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <LoadingSpinner size="lg" text="Loading classes..." />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
+    <div className="container mx-auto p-6 space-y-6 max-w-7xl">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Manage Classes</h1>
-          <p className="text-muted-foreground">Add, edit, and manage gym classes</p>
+          <h1 className="text-3xl font-bold">Class Management</h1>
+          <p className="text-muted-foreground">Manage classes, sessions, and instructors</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={handleDialogClose}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) {
+            classForm.reset();
+            setEditingClass(null);
+          }
+        }}>
           <DialogTrigger asChild>
-            <Button onClick={resetForm}>
+            <Button onClick={() => {
+              classForm.reset();
+              setEditingClass(null);
+            }}>
               <Plus className="w-4 h-4 mr-2" />
               Add Class
             </Button>
@@ -367,375 +520,602 @@ const AdminManageClasses = () => {
                 {editingClass ? "Update class details" : "Create a new gym class"}
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Class Name *</Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
+            <Form {...classForm}>
+              <form onSubmit={classForm.handleSubmit(handleClassSubmit)} className="space-y-4">
+                <FormField
+                  control={classForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Class Name *</FormLabel>
+                      <FormControl>
+                        <Input {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={3}
+                <FormField
+                  control={classForm.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea {...field} rows={3} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="instructor">Instructor *</Label>
-                  <Input
-                    id="instructor"
-                    value={formData.instructor}
-                    onChange={(e) => setFormData({ ...formData, instructor: e.target.value })}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Input
-                    id="category"
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    placeholder="e.g., Cardio, Strength"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Schedule *</Label>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="schedule-date">Date</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            "w-full justify-start text-left font-normal",
-                            !scheduleDate && "text-muted-foreground"
-                          )}
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {scheduleDate ? format(scheduleDate, "PPP") : <span>Pick a date</span>}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={scheduleDate}
-                          onSelect={setScheduleDate}
-                          initialFocus
-                          className="pointer-events-auto"
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="schedule-time">Time</Label>
-                    <Input
-                      id="schedule-time"
-                      type="time"
-                      value={scheduleTime}
-                      onChange={(e) => setScheduleTime(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="duration">Duration (minutes) *</Label>
-                  <Input
-                    id="duration"
-                    type="number"
-                    value={formData.duration}
-                    onChange={(e) => setFormData({ ...formData, duration: parseInt(e.target.value) })}
-                    required
-                    min="1"
+                  <FormField
+                    control={classForm.control}
+                    name="instructor"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Instructor *</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="Instructor name" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={classForm.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="e.g., Cardio, Strength" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="capacity">Capacity *</Label>
-                  <Input
-                    id="capacity"
-                    type="number"
-                    value={formData.capacity}
-                    onChange={(e) => setFormData({ ...formData, capacity: parseInt(e.target.value) })}
-                    required
-                    min="1"
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={classForm.control}
+                    name="duration"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Duration (minutes) *</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            min="1"
+                            max="480"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={classForm.control}
+                    name="capacity"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Capacity *</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            min="1"
+                            max="1000"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
                   />
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="image_url">Image URL</Label>
-                <Input
-                  id="image_url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  placeholder="https://example.com/image.jpg"
+                <FormField
+                  control={classForm.control}
+                  name="image_url"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Image URL</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="https://example.com/image.jpg" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="is_active"
-                  checked={formData.is_active}
-                  onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
+                <FormField
+                  control={classForm.control}
+                  name="is_active"
+                  render={({ field }) => (
+                    <FormItem className="flex items-center space-x-2 space-y-0">
+                      <FormControl>
+                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                      <FormLabel>Active (visible to members)</FormLabel>
+                    </FormItem>
+                  )}
                 />
-                <Label htmlFor="is_active">Active (visible to members)</Label>
-              </div>
-
-              <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => handleDialogClose(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit">
-                  {editingClass ? "Update" : "Create"} Class
-                </Button>
-              </DialogFooter>
-            </form>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit">{editingClass ? "Update" : "Create"} Class</Button>
+                </DialogFooter>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>All Classes</CardTitle>
-          <CardDescription>Manage your gym's class schedule and create sessions</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Instructor</TableHead>
-                <TableHead>Schedule</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Capacity</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {classes.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
-                    No classes found. Create your first class!
-                  </TableCell>
-                </TableRow>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
+        <TabsList>
+          <TabsTrigger value="classes">Classes</TabsTrigger>
+          <TabsTrigger value="sessions">Sessions</TabsTrigger>
+          <TabsTrigger value="instructors">Instructors</TabsTrigger>
+        </TabsList>
+
+        {/* Classes Tab */}
+        <TabsContent value="classes" className="space-y-4">
+          {/* Search and Filters */}
+          <div className="grid md:grid-cols-3 gap-4">
+            <Card className="md:col-span-2">
+              <CardContent className="p-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search classes..."
+                    className="pl-10"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <Select value={instructorFilter} onValueChange={setInstructorFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Instructor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Instructors</SelectItem>
+                    {instructors.map((inst) => (
+                      <SelectItem key={inst.name} value={inst.name}>
+                        {inst.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>All Classes ({filteredClasses.length})</CardTitle>
+              <CardDescription>Manage your gym's class schedule and create sessions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {filteredClasses.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground mb-4">No classes found</p>
+                  <Button onClick={() => setDialogOpen(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create First Class
+                  </Button>
+                </div>
               ) : (
-                classes.map((classItem) => (
-                  <TableRow key={classItem.id}>
-                    <TableCell className="font-medium">{classItem.name}</TableCell>
-                    <TableCell>{classItem.instructor}</TableCell>
-                    <TableCell>{classItem.schedule}</TableCell>
-                    <TableCell>{classItem.duration} min</TableCell>
-                    <TableCell>{classItem.capacity}</TableCell>
-                    <TableCell>
-                      <span
-                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          classItem.is_active
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {classItem.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleEdit(classItem)}
-                          title="Edit class"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleCreateSession(classItem)}
-                          title="Create session"
-                        >
-                          <CalendarIcon className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          onClick={() => handleDelete(classItem.id)}
-                          title="Delete class"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Instructor</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Duration</TableHead>
+                        <TableHead>Capacity</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredClasses.map((classItem) => (
+                        <TableRow key={classItem.id}>
+                          <TableCell className="font-medium">{classItem.name}</TableCell>
+                          <TableCell>{classItem.instructor}</TableCell>
+                          <TableCell>{classItem.category || "-"}</TableCell>
+                          <TableCell>{classItem.duration} min</TableCell>
+                          <TableCell>{classItem.capacity}</TableCell>
+                          <TableCell>
+                            <Badge variant={classItem.is_active ? "default" : "secondary"}>
+                              {classItem.is_active ? "Active" : "Inactive"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button variant="ghost" size="icon" onClick={() => handleEdit(classItem)}>
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleCreateSession(classItem)}
+                              >
+                                <CalendarIcon className="w-4 h-4" />
+                              </Button>
+                              <Button variant="destructive" size="icon" onClick={() => handleDelete(classItem.id)}>
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Sessions Tab */}
+        <TabsContent value="sessions" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Class Sessions</CardTitle>
+              <CardDescription>View and manage class session capacity</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {sessionsLoading ? (
+                <LoadingSpinner size="md" text="Loading sessions..." />
+              ) : sessions.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No sessions found. Create sessions from classes.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Class Name</TableHead>
+                        <TableHead>Instructor</TableHead>
+                        <TableHead>Start Time</TableHead>
+                        <TableHead>Capacity</TableHead>
+                        <TableHead>Booked</TableHead>
+                        <TableHead>Available</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {sessions.map((session) => {
+                        const capacity = sessionCapacities.get(session.id);
+                        return (
+                          <TableRow key={session.id}>
+                            <TableCell className="font-medium">{session.name}</TableCell>
+                            <TableCell>{session.instructor || "-"}</TableCell>
+                            <TableCell>{format(parseISO(session.start_time), "MMM d, yyyy 'at' h:mm a")}</TableCell>
+                            <TableCell>{session.capacity || 0}</TableCell>
+                            <TableCell>
+                              <Badge variant={capacity && capacity.booked >= (capacity.capacity * 0.9) ? "destructive" : "secondary"}>
+                                {capacity?.booked || 0}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={capacity && capacity.available <= 5 ? "default" : "outline"}>
+                                {capacity?.available || 0}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingSession(session);
+                                  setCapacityDialogOpen(true);
+                                }}
+                              >
+                                <Edit className="w-4 h-4 mr-2" />
+                                Edit Capacity
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Instructors Tab */}
+        <TabsContent value="instructors" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Instructors</CardTitle>
+              <CardDescription>View instructor statistics and assignments</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {instructors.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground">No instructors found. Add instructors when creating classes.</p>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {instructors.map((instructor) => (
+                    <Card key={instructor.name}>
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <h3 className="font-semibold text-lg">{instructor.name}</h3>
+                          <UserPlus className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Classes</span>
+                            <Badge variant="secondary">{instructor.class_count}</Badge>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Sessions</span>
+                            <Badge variant="secondary">{instructor.session_count}</Badge>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Create Session Dialog */}
       <Dialog open={sessionDialogOpen} onOpenChange={setSessionDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create Class Session{sessionFormData.recurring ? "s" : ""}</DialogTitle>
+            <DialogTitle>Create Class Session{sessionForm.watch("recurring") ? "s" : ""}</DialogTitle>
             <DialogDescription>
               {selectedClassForSession && (
-                <>Create session{sessionFormData.recurring ? "s" : ""} for <strong>{selectedClassForSession.name}</strong></>
+                <>Create session{sessionForm.watch("recurring") ? "s" : ""} for <strong>{selectedClassForSession.name}</strong></>
               )}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleCreateSessionSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label>Start Date *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !sessionFormData.startDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {sessionFormData.startDate ? (
-                      format(sessionFormData.startDate, "PPP")
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={sessionFormData.startDate}
-                    onSelect={(date) => setSessionFormData({ ...sessionFormData, startDate: date })}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="start-time">Start Time *</Label>
-                <Input
-                  id="start-time"
-                  type="time"
-                  value={sessionFormData.startTime}
-                  onChange={(e) => setSessionFormData({ ...sessionFormData, startTime: e.target.value })}
-                  required
+          <Form {...sessionForm}>
+            <form onSubmit={sessionForm.handleSubmit(handleSessionSubmit)} className="space-y-4">
+              <FormField
+                control={sessionForm.control}
+                name="startDate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Start Date *</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn("w-full justify-start text-left font-normal", !field.value && "text-muted-foreground")}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={sessionForm.control}
+                  name="startTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Time *</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={sessionForm.control}
+                  name="endTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Time *</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="end-time">End Time *</Label>
+              <FormField
+                control={sessionForm.control}
+                name="capacity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Capacity *</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                        min="1"
+                        max="1000"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={sessionForm.control}
+                name="recurring"
+                render={({ field }) => (
+                  <FormItem className="flex items-center space-x-2 space-y-0">
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                    <FormLabel className="flex items-center gap-2">
+                      <Repeat className="w-4 h-4" />
+                      Create recurring sessions
+                    </FormLabel>
+                  </FormItem>
+                )}
+              />
+              {sessionForm.watch("recurring") && (
+                <div className="space-y-4 pl-6 border-l-2">
+                  <FormField
+                    control={sessionForm.control}
+                    name="recurringType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Repeat Every</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="daily">Day</SelectItem>
+                            <SelectItem value="weekly">Week</SelectItem>
+                            <SelectItem value="monthly">Month</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={sessionForm.control}
+                    name="recurringCount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Number of Sessions *</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                            min="1"
+                            max="52"
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Will create {sessionForm.watch("recurringCount")} session(s) starting from the selected date
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setSessionDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit">Create Session{sessionForm.watch("recurring") ? "s" : ""}</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Capacity Dialog */}
+      <Dialog open={capacityDialogOpen} onOpenChange={setCapacityDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Session Capacity</DialogTitle>
+            <DialogDescription>
+              {editingSession && `Update capacity for ${editingSession.name}`}
+            </DialogDescription>
+          </DialogHeader>
+          {editingSession && (
+            <div className="space-y-4">
+              <div>
+                <Label>Current Capacity</Label>
+                <Input type="number" value={editingSession.capacity || 0} readOnly />
+              </div>
+              <div>
+                <Label>New Capacity</Label>
                 <Input
-                  id="end-time"
-                  type="time"
-                  value={sessionFormData.endTime}
-                  onChange={(e) => setSessionFormData({ ...sessionFormData, endTime: e.target.value })}
-                  required
+                  type="number"
+                  id="new-capacity"
+                  min="1"
+                  max="1000"
+                  defaultValue={editingSession.capacity || 0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const input = e.target as HTMLInputElement;
+                      handleUpdateSessionCapacity(editingSession.id, parseInt(input.value) || 0);
+                    }
+                  }}
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="capacity">Capacity *</Label>
-              <Input
-                id="capacity"
-                type="number"
-                value={sessionFormData.capacity}
-                onChange={(e) => setSessionFormData({ ...sessionFormData, capacity: parseInt(e.target.value) })}
-                required
-                min="1"
-              />
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <Switch
-                id="recurring"
-                checked={sessionFormData.recurring}
-                onCheckedChange={(checked) => setSessionFormData({ ...sessionFormData, recurring: checked })}
-              />
-              <Label htmlFor="recurring" className="flex items-center gap-2">
-                <Repeat className="w-4 h-4" />
-                Create recurring sessions
-              </Label>
-            </div>
-
-            {sessionFormData.recurring && (
-              <div className="space-y-4 pl-6 border-l-2">
-                <div className="space-y-2">
-                  <Label htmlFor="recurring-type">Repeat Every</Label>
-                  <Select
-                    value={sessionFormData.recurringType}
-                    onValueChange={(value: "daily" | "weekly" | "monthly") =>
-                      setSessionFormData({ ...sessionFormData, recurringType: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="daily">Day</SelectItem>
-                      <SelectItem value="weekly">Week</SelectItem>
-                      <SelectItem value="monthly">Month</SelectItem>
-                    </SelectContent>
-                  </Select>
+              {sessionCapacities.has(editingSession.id) && (
+                <div className="p-4 bg-muted rounded-lg">
+                  <p className="text-sm font-medium mb-2">Current Status</p>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span>Booked:</span>
+                      <span className="font-medium">{sessionCapacities.get(editingSession.id)?.booked || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Available:</span>
+                      <span className="font-medium">{sessionCapacities.get(editingSession.id)?.available || 0}</span>
+                    </div>
+                  </div>
                 </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="recurring-count">Number of Sessions *</Label>
-                  <Input
-                    id="recurring-count"
-                    type="number"
-                    value={sessionFormData.recurringCount}
-                    onChange={(e) =>
-                      setSessionFormData({ ...sessionFormData, recurringCount: parseInt(e.target.value) })
+              )}
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCapacityDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    const input = document.getElementById("new-capacity") as HTMLInputElement;
+                    if (input) {
+                      handleUpdateSessionCapacity(editingSession.id, parseInt(input.value) || 0);
                     }
-                    required
-                    min="1"
-                    max="52"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Will create {sessionFormData.recurringCount} session(s) starting from the selected date
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setSessionDialogOpen(false);
-                  resetSessionForm();
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit">
-                Create Session{sessionFormData.recurring ? "s" : ""}
-              </Button>
-            </DialogFooter>
-          </form>
+                  }}
+                >
+                  Update Capacity
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
