@@ -74,6 +74,11 @@ serve(async (req) => {
     }
 
     // Create checkout session for subscription
+    // Determine base path based on origin (for GitHub Pages deployment)
+    const origin = req.headers.get("origin") || "";
+    const isProduction = origin.includes("pinnacleadvisors.github.io");
+    const basePath = isProduction ? "/mars-space-gym-buddy" : "";
+    
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       line_items: [
@@ -83,8 +88,8 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
-      success_url: `${req.headers.get("origin")}/managememberships?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${req.headers.get("origin")}/managememberships?canceled=true`,
+      success_url: `${origin}${basePath}/managememberships?success=true&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}${basePath}/managememberships?canceled=true`,
       metadata: {
         supabase_user_id: user.id
       }

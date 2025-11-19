@@ -34,7 +34,7 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
+        <BrowserRouter basename="/mars-space-gym-buddy">
           <AppLayout>
             <Routes>
             {/* Public Routes */}

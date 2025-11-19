@@ -335,8 +335,8 @@ Used in `.github/workflows/github-actions-demo.yml`:
 - **Auth**: Requires Bearer token
 - **Returns**: Stripe checkout URL
 - **Price ID**: `price_1STEriRpTziRf7OxCPXLGPLw` (£150/month)
-- **Success URL**: `/managememberships?success=true&session_id={CHECKOUT_SESSION_ID}`
-- **Cancel URL**: `/managememberships?canceled=true`
+- **Success URL**: `/mars-space-gym-buddy/managememberships?success=true&session_id={CHECKOUT_SESSION_ID}` (includes base path for GitHub Pages)
+- **Cancel URL**: `/mars-space-gym-buddy/managememberships?canceled=true` (includes base path for GitHub Pages)
 - **Validation**: Server-side email validation and rate limiting (5 requests per minute per IP)
 
 ### `check-subscription`
@@ -354,6 +354,8 @@ Used in `.github/workflows/github-actions-demo.yml`:
 - **Logic**: Sets `cancel_at_period_end: true` in Stripe, updates status to 'cancelled'
 
 ## 🛣️ Application Routes
+
+**Note**: All routes below are relative to the base path `/mars-space-gym-buddy` on GitHub Pages. In development, they work at `http://localhost:8080/`. In production, they work at `https://pinnacleadvisors.github.io/mars-space-gym-buddy/`.
 
 ### Public Routes
 - `/` - Landing page
@@ -413,6 +415,14 @@ Defined in `src/index.css`:
 - **Port**: 8080
 - **Alias**: `@` → `./src`
 - **Plugins**: React SWC, lovable-tagger (dev only)
+- **Note**: Base path handles asset paths (images, CSS, JS) automatically in production builds
+
+### React Router Configuration
+- **Base Path**: `/mars-space-gym-buddy` (configured via `BrowserRouter basename` prop)
+- **Note**: All routes are relative to the base path on GitHub Pages
+- **Development**: Routes work normally at `http://localhost:8080/`
+- **Production**: Routes work at `https://pinnacleadvisors.github.io/mars-space-gym-buddy/`
+- **Navigation**: All `navigate()` calls use relative paths (e.g., `/login`, `/dashboard`) and automatically account for base path
 
 ### `tsconfig.json`
 - **Path Alias**: `@/*` → `./src/*`
