@@ -42,6 +42,7 @@ const Login = () => {
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    mode: "onBlur", // Validate on blur for better UX
     defaultValues: {
       email: "",
       password: "",
@@ -198,7 +199,7 @@ const Login = () => {
               <FormField
                 control={form.control}
                 name="email"
-                render={({ field }) => (
+                render={({ field, fieldState }) => (
                   <FormItem>
                     <FormLabel>Email</FormLabel>
                     <FormControl>
@@ -216,7 +217,7 @@ const Login = () => {
               <FormField
                 control={form.control}
                 name="password"
-                render={({ field }) => (
+                render={({ field, fieldState }) => (
                   <FormItem>
                     <div className="flex items-center justify-between">
                       <FormLabel>Password</FormLabel>
@@ -243,7 +244,7 @@ const Login = () => {
               <Button 
                 type="submit" 
                 className="w-full bg-secondary hover:bg-secondary/90" 
-                disabled={isLoading || (lockoutInfo?.isLocked ?? false)}
+                disabled={isLoading || (lockoutInfo?.isLocked ?? false) || Object.keys(form.formState.errors).length > 0}
               >
                 {isLoading ? "Signing in..." : lockoutInfo?.isLocked ? "Account Locked" : "Sign In"}
               </Button>

@@ -235,11 +235,11 @@ This roadmap outlines all tasks needed to make the application fully functional.
   - [x] Implement toast queue management
   - [x] Add auto-dismiss timers
 
-- [ ] **Form Validation Feedback**
-  - [ ] Show inline validation errors
-  - [ ] Highlight invalid fields
-  - [ ] Provide helpful error messages
-  - [ ] Disable submit button during validation
+- [x] **Form Validation Feedback**
+  - [x] Show inline validation errors
+  - [x] Highlight invalid fields
+  - [x] Provide helpful error messages
+  - [x] Disable submit button during validation
 
 **Dependencies**: None  
 **Estimated Effort**: 2-3 days

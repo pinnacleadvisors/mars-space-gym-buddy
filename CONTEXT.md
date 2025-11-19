@@ -1089,6 +1089,103 @@ toast({
 - ✅ Reset Password page: Password reset success/error messages
 - ✅ All error handling: Uses standardized error toasts
 
+### Form Validation Feedback
+The application implements comprehensive form validation feedback for better user experience:
+
+**Inline Validation Errors:**
+- `FormMessage` component displays error messages below each field
+- Errors are shown in red text with destructive styling
+- Errors appear automatically when validation fails
+- Uses Zod schema validation messages
+
+**Visual Field Highlighting:**
+- Invalid fields show red border (`border-destructive`)
+- Error state detected via `data-error` attribute from `FormControl`
+- Focus ring changes to red for invalid fields
+- Labels turn red when field has error (`text-destructive`)
+- Smooth transitions for visual feedback
+
+**Helpful Error Messages:**
+- Zod schemas provide descriptive error messages:
+  - Email: "Please enter a valid email address"
+  - Password: "Password must be at least 8 characters long" and "Password must contain at least one uppercase letter, one lowercase letter, and one number"
+  - Full name: "Full name can only contain letters, spaces, hyphens, and apostrophes"
+- `FormDescription` component provides helpful hints (e.g., password requirements)
+- Error messages are context-aware and specific
+
+**Submit Button State:**
+- Submit buttons are disabled when:
+  - Form has validation errors (`Object.keys(form.formState.errors).length > 0`)
+  - Form is submitting (`isLoading === true`)
+  - Account is locked (for login form)
+- Button text changes to show loading state (e.g., "Signing in...", "Creating Account...")
+- Prevents submission of invalid forms
+
+**Validation Timing:**
+- Forms use `mode: "onBlur"` for validation
+- Validates when user leaves a field (better UX than on every keystroke)
+- Immediate feedback when field loses focus
+- Prevents showing errors before user has finished typing
+
+**Form Components:**
+- `Form`: Wraps form with react-hook-form provider
+- `FormField`: Connects field to form state
+- `FormItem`: Container for field with spacing
+- `FormLabel`: Label that turns red on error
+- `FormControl`: Wraps input and sets error attributes
+- `FormMessage`: Displays validation error messages
+- `FormDescription`: Shows helpful hints and requirements
+
+**Enhanced Input Component:**
+- `Input` component automatically detects error state
+- Shows red border when `data-error="true"` or `aria-invalid="true"`
+- Red focus ring for invalid fields
+- Smooth color transitions
+
+**Usage Example:**
+```typescript
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage, FormDescription } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+
+const form = useForm<FormData>({
+  resolver: zodResolver(validationSchema),
+  mode: "onBlur", // Validate on blur
+  defaultValues: { /* ... */ },
+});
+
+<Form {...form}>
+  <form onSubmit={form.handleSubmit(handleSubmit)}>
+    <FormField
+      control={form.control}
+      name="email"
+      render={({ field }) => (
+        <FormItem>
+          <FormLabel>Email</FormLabel>
+          <FormControl>
+            <Input type="email" {...field} />
+          </FormControl>
+          <FormDescription>Enter your email address</FormDescription>
+          <FormMessage />
+        </FormItem>
+      )}
+    />
+    <Button 
+      type="submit" 
+      disabled={isLoading || Object.keys(form.formState.errors).length > 0}
+    >
+      Submit
+    </Button>
+  </form>
+</Form>
+```
+
+**Pages with Form Validation Feedback:**
+- ✅ Login page: Email and password validation with error highlighting
+- ✅ Register page: Full name, email, password, and confirm password validation with helpful descriptions
+- ✅ All forms: Submit buttons disabled when form has errors or is submitting
+
 ## 📚 Additional Resources
 
 - **Supabase Project ID**: `yggvabrltcxvkiyjixdv`

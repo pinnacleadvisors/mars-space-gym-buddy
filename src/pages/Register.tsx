@@ -31,6 +31,7 @@ const Register = () => {
 
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
+    mode: "onBlur", // Validate on blur for better UX
     defaultValues: {
       fullName: "",
       email: "",
@@ -182,6 +183,9 @@ const Register = () => {
                           {...field}
                         />
                       </FormControl>
+                      <FormDescription className="text-xs">
+                        Must be at least 8 characters with uppercase, lowercase, and a number
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -204,7 +208,11 @@ const Register = () => {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isLoading}>
+                <Button 
+                  type="submit" 
+                  className="w-full bg-accent hover:bg-accent/90" 
+                  disabled={isLoading || Object.keys(form.formState.errors).length > 0}
+                >
                   {isLoading ? "Creating Account..." : "Create Account"}
                 </Button>
               </form>
