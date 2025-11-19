@@ -43,7 +43,7 @@ mars-space-gym-buddy/
 │   │   ├── useBookings.ts         # Bookings hook (✅ implemented)
 │   │   ├── useAnalytics.ts        # Analytics hook (✅ implemented)
 │   │   ├── useErrorHandler.ts     # Error handling hook (✅ implemented)
-│   │   ├── useNavigationLoading.ts # Navigation loading hook (✅ implemented)
+│   │   ├── useNavigationLoading.tsx # Navigation loading hook (✅ implemented)
 │   │   ├── use-mobile.tsx         # Mobile detection hook
 │   │   └── use-toast.ts           # Toast notification hook
 │   ├── integrations/

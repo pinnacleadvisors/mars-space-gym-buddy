@@ -626,3 +626,7 @@ The app will be considered "fully functional" when:
 - Dependencies between tasks should be considered when planning sprints
 - Regular reviews should be conducted to track progress
 
+### Build Issues Resolved
+
+- ✅ **Fixed build error in `useNavigationLoading`**: Renamed file from `.ts` to `.tsx` to support JSX syntax (the file contains a React component). Files containing JSX must use the `.tsx` extension.
+
