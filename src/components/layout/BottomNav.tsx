@@ -51,37 +51,32 @@ export function BottomNav() {
     checkAdminRole();
   }, []);
 
-  // 🧭 Default member navigation items
+  // 🧭 Default member navigation items (limited to 4 for mobile)
   const baseNavItems = [
+    { icon: LayoutDashboard, label: "Home", path: "/dashboard" },
     { icon: Calendar, label: "Classes", path: "/classes" },
     { icon: BookOpen, label: "Bookings", path: "/bookings" },
     { icon: CreditCard, label: "Membership", path: "/managememberships" },
-    { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   ];
 
-  // 🧩 Admin-only navigation items (appended if admin)
+  // 🧩 Admin navigation items (shown when on admin routes)
   const adminNavItems = [
     { icon: Shield, label: "Admin", path: "/admin" },
     { icon: Users, label: "Users", path: "/admin/users" },
     { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },
     { icon: ClipboardList, label: "Classes", path: "/admin/manageclasses" },
-    { icon: CreditCard, label: "Memberships", path: "/admin/memberships" },
-    { icon: UserCheck, label: "User Memberships", path: "/admin/usermemberships" },
   ];
 
-  // 🧠 Combine base + admin navs if user is admin
-  const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems;
+  // 🧠 Determine which nav items to show based on current route and admin status
+  const isAdminRoute = location.pathname.startsWith('/admin');
+  const navItems = isAdminRoute && isAdmin ? adminNavItems : baseNavItems;
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:hidden">
-      <div
-        className={cn(
-          "grid h-16",
-          `grid-cols-${navItems.length}` // Adjust dynamically based on number of items
-        )}
-      >
+      <div className="grid h-16 grid-cols-4">
         {navItems.map((item) => {
-          const isActive = location.pathname === item.path;
+          const isActive = location.pathname === item.path || 
+            (item.path !== "/dashboard" && location.pathname.startsWith(item.path));
           const Icon = item.icon;
 
           return (
@@ -89,14 +84,14 @@ export function BottomNav() {
               key={item.path}
               onClick={() => navigate(item.path)}
               className={cn(
-                "flex flex-col items-center justify-center gap-1 transition-colors px-1",
+                "flex flex-col items-center justify-center gap-1 transition-colors px-1 min-w-0",
                 isActive
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Icon className="h-5 w-5" />
-              <span className="text-[10px] font-medium text-center">
+              <Icon className="h-5 w-5 shrink-0" />
+              <span className="text-[10px] font-medium text-center truncate w-full">
                 {item.label}
               </span>
             </button>

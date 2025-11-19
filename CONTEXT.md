@@ -14,10 +14,10 @@ mars-space-gym-buddy/
 │   ├── assets/                    # Static assets (images, etc.)
 │   ├── components/
 │   │   ├── layout/                # Layout components
-│   │   │   ├── AppLayout.tsx      # Main app layout wrapper
-│   │   │   ├── AppSidebar.tsx     # Sidebar navigation
-│   │   │   ├── BottomNav.tsx      # Mobile bottom navigation
-│   │   │   └── TopBar.tsx         # Top navigation bar
+│   │   │   ├── AppLayout.tsx      # Main app layout wrapper (conditionally shows navigation for authenticated users)
+│   │   │   ├── AppSidebar.tsx     # Sidebar navigation (desktop only, shows for authenticated users)
+│   │   │   ├── BottomNav.tsx      # Mobile bottom navigation (4-item fixed grid, context-aware for admin routes)
+│   │   │   └── TopBar.tsx         # Top navigation bar (shows for authenticated users)
 │   │   └── ui/                    # shadcn/ui components (40+ components)
 │   ├── components/
 │   │   └── auth/                  # Authentication components
@@ -63,7 +63,8 @@ mars-space-gym-buddy/
 │   │       ├── errorHandler.ts    # Global error handling utility
 │   │       ├── networkErrorHandler.ts # Network error handling utility
 │   │       ├── toastHelpers.ts    # Toast notification helpers
-│   │       └── qrCode.ts          # QR code generation utilities
+│   │       ├── qrCode.ts          # QR code generation utilities
+│   │       └── pathUtils.ts       # Path utilities for base path handling (GitHub Pages)
 │   ├── lib/
 │   │   └── validations/          # Zod validation schemas
 │   │       ├── auth.ts            # Authentication form schemas
@@ -423,6 +424,14 @@ Defined in `src/index.css`:
 - **Development**: Routes work normally at `http://localhost:8080/`
 - **Production**: Routes work at `https://pinnacleadvisors.github.io/mars-space-gym-buddy/`
 - **Navigation**: All `navigate()` calls use relative paths (e.g., `/login`, `/dashboard`) and automatically account for base path
+- **Base Path Detection**: `pathUtils.ts` provides `getBasePath()`, `getFullPath()`, and `getFullRedirectUrl()` utilities for conditional base path handling
+
+### Layout & Navigation Configuration
+- **AppLayout**: Conditionally renders navigation (TopBar, BottomNav, Sidebar) only for authenticated users on protected routes
+- **Public Routes**: Landing, Login, Register, ForgotPassword, and ResetPassword pages render without navigation
+- **Protected Routes**: Navigation is shown automatically when user is authenticated
+- **BottomNav**: Fixed 4-item grid layout for mobile, shows context-aware items (base nav items for regular users, admin nav items when on admin routes)
+- **Image Paths**: Use `import.meta.env.BASE_URL` for public folder assets to handle GitHub Pages base path correctly
 
 ### `tsconfig.json`
 - **Path Alias**: `@/*` → `./src/*`
@@ -574,6 +583,31 @@ import { AdminRoute } from "@/components/auth/AdminRoute";
 />
 ```
 
+### Path Utilities (GitHub Pages Base Path)
+```typescript
+import { getBasePath, getFullPath, getFullRedirectUrl } from '@/lib/utils/pathUtils';
+
+// Get base path (only returns '/mars-space-gym-buddy' in production)
+const basePath = getBasePath(); // Returns '/mars-space-gym-buddy' or ''
+
+// Get full path with base path (for internal redirects)
+const fullPath = getFullPath('/dashboard'); // Returns '/mars-space-gym-buddy/dashboard' or '/dashboard'
+
+// Get full redirect URL with origin (for Supabase emailRedirectTo, OAuth redirects)
+const redirectUrl = getFullRedirectUrl('/dashboard'); 
+// Returns 'https://pinnacleadvisors.github.io/mars-space-gym-buddy/dashboard' in production
+// Returns 'http://localhost:8080/dashboard' in development
+
+// Usage in Supabase auth
+await supabase.auth.signUp({
+  email,
+  password,
+  options: {
+    emailRedirectTo: getFullRedirectUrl('/dashboard'),
+  },
+});
+```
+
 ### Session Management
 ```typescript
 import { useSessionManager } from "@/hooks/useSessionManager";
@@ -627,7 +661,9 @@ const MyComponent = () => {
 The Landing page (`src/pages/Landing.tsx`) includes:
 - **High-end welcome/onboarding screen**: Premium design with full-screen hero background image
 - **Full-screen hero background**: Uses `hero-background.jpg` as fixed background with overlay for readability
+  - Image path uses `import.meta.env.BASE_URL` for proper GitHub Pages base path handling
 - **Centered logo**: Displays `earth-space-logo-9.webp` near the top of the page
+  - Image path uses `import.meta.env.BASE_URL` for proper GitHub Pages base path handling
 - **Premium typography**: 
   - Large serif headline "Welcome to Earth Space" in white (5xl to 7xl responsive sizing)
   - Sans-serif body text in white describing features (class timetable, class booking, membership management)
@@ -637,6 +673,8 @@ The Landing page (`src/pages/Landing.tsx`) includes:
 - **Design principles**: Generous spacing, strong visual hierarchy, premium typography, clean layout, muted luxury color palette
 - **Responsive design**: Adapts to mobile, tablet, and desktop screen sizes
 - **Navigation**: Log in button navigates to `/login`, Join button navigates to `/register`
+- **No App Navigation**: Renders without TopBar, BottomNav, or Sidebar (public route)
+- **No App Navigation**: Renders without TopBar, BottomNav, or Sidebar (public route)
 
 ### Classes Page Features
 The Classes page (`src/pages/Classes.tsx`) includes:

@@ -9,7 +9,7 @@ const Landing = () => {
       {/* Full-screen hero background image */}
       <div 
         className="fixed inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: 'url("/hero-background.jpg")' }}
+        style={{ backgroundImage: `url("${import.meta.env.BASE_URL}hero-background.jpg")` }}
       />
       
       {/* Overlay for better text readability */}
@@ -20,7 +20,7 @@ const Landing = () => {
         {/* Logo near the top */}
         <div className="flex-shrink-0 mt-8 md:mt-12">
           <img 
-            src="/earth-space-logo-9.webp" 
+            src={`${import.meta.env.BASE_URL}earth-space-logo-9.webp`}
             alt="Earth Space" 
             className="h-16 md:h-20 lg:h-24 w-auto mx-auto"
           />
