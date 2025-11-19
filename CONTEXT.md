@@ -80,6 +80,7 @@ mars-space-gym-buddy/
 │   │   ├── Classes.tsx            # Class listings (✅ fully implemented with booking, filters, search)
 │   │   ├── Bookings.tsx           # User bookings (✅ fully implemented with list/calendar views, cancel functionality)
 │   │   ├── ManageMemberships.tsx  # Membership management
+│   │   ├── Profile.tsx            # User profile management (✅ fully implemented with profile editing, avatar upload, membership/booking history)
 │   │   ├── EntryExit.tsx          # Combined QR code check-in/check-out
 │   │   ├── AdminLogin.tsx         # Admin login
 │   │   ├── AdminDashboard.tsx     # Admin dashboard
@@ -366,6 +367,7 @@ Used in `.github/workflows/github-actions-demo.yml`:
 - `/classes` - Browse classes
 - `/bookings` - View/manage bookings
 - `/managememberships` - Membership management
+- `/profile` - User profile management (view/edit profile, membership history, booking history)
 - `/qr/entry-exit` - QR check-in/check-out (requires valid membership + location, toggles between entry and exit based on active check-in status)
 
 **Note**: All authenticated routes are wrapped with `ProtectedRoute` component which:
@@ -657,6 +659,41 @@ The Dashboard page (`src/pages/Dashboard.tsx`) includes:
 - **Real-time Data**: Fetches latest bookings, check-ins, and membership status
 - **Loading States**: Uses LoadingSpinner component during data fetch
 - **Error Handling**: Toast notifications for errors
+
+### Profile Management Features
+The Profile page (`src/pages/Profile.tsx`) includes:
+- **Profile Information Tab**:
+  - View and edit personal information (name, phone, address, date of birth)
+  - Emergency contact information
+  - Health notes (confidential)
+  - Profile picture upload with avatar display
+  - Form validation using Zod schemas
+  - Input sanitization for security
+- **Profile Picture Upload**:
+  - Upload images to Supabase Storage (`avatars` bucket)
+  - File type validation (images only)
+  - File size validation (max 5MB)
+  - Automatic URL generation and profile update
+  - Avatar display with fallback initials
+- **Membership History Tab**:
+  - Complete membership subscription history
+  - Shows membership name, price, dates, and status
+  - Status badges (Active, Expired, Inactive)
+  - Payment status display
+  - Quick link to membership plans
+- **Booking History Tab**:
+  - Complete class booking history (last 50 bookings)
+  - Shows class name, instructor, date/time
+  - Booking status badges (Booked, Attended, Cancelled, No Show)
+  - Booking date information
+  - Quick link to browse classes
+- **Tabbed Interface**: Organized into Profile, Membership History, and Booking History
+- **Edit Mode**: Toggle between view and edit modes for profile information
+- **Real-time Updates**: Fetches latest data on page load
+- **Error Handling**: Toast notifications for all operations
+- **Loading States**: Loading spinner during data fetch
+
+**Note**: The `avatars` storage bucket must be created in Supabase Storage for profile picture uploads to work. The bucket should be public or have appropriate RLS policies.
 
 ### Bookings Page Features
 The Bookings page (`src/pages/Bookings.tsx`) includes:

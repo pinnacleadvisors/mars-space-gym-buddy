@@ -78,6 +78,7 @@ export function AppSidebar() {
     { icon: BookOpen, label: "Bookings", path: "/bookings" },
     { icon: CreditCard, label: "Membership", path: "/managememberships" },
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+    { icon: UserCog, label: "Profile", path: "/profile" },
   ];
 
   // 🧩 Admin-only menu (added if admin)

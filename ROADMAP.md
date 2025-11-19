@@ -288,12 +288,12 @@ This roadmap outlines all tasks needed to make the application fully functional.
   - [ ] Add personalized recommendations (optional - future enhancement)
   - [ ] Implement dashboard customization (optional - future enhancement)
 
-- [ ] **Profile Management**
-  - [ ] Create user profile page
-  - [ ] Allow users to update profile information
-  - [ ] Add profile picture upload
-  - [ ] Show membership history
-  - [ ] Display booking history
+- [x] **Profile Management**
+  - [x] Create user profile page
+  - [x] Allow users to update profile information
+  - [x] Add profile picture upload
+  - [x] Show membership history
+  - [x] Display booking history
 
 **Dependencies**: Authentication system  
 **Estimated Effort**: 2-3 days

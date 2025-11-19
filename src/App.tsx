@@ -23,6 +23,7 @@ import AdminManageClasses from "./pages/AdminManageClasses";
 import AdminManageMemberships from "./pages/AdminManageMemberships";
 import AdminUserMemberships from "./pages/AdminUserMemberships";
 import ManageMemberships from "./pages/ManageMemberships";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -73,6 +74,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <ManageMemberships />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/profile"
+              element={
+                <ProtectedRoute>
+                  <Profile />
                 </ProtectedRoute>
               }
             />
