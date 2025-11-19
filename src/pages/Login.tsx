@@ -140,7 +140,12 @@ const Login = () => {
       }
 
       toast(toastMessages.loginSuccess());
-      navigate("/dashboard");
+      
+      // Small delay to allow auth state to propagate before navigation
+      // This prevents race conditions with useAuth hook's onAuthStateChange listener
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 100);
     } catch (error: any) {
       // Error already handled above
     } finally {

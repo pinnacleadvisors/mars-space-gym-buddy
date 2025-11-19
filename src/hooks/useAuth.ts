@@ -124,12 +124,48 @@ export const useAuth = () => {
             // Use refreshed session
             if (refreshedSession.user && mounted) {
               const userData = await fetchUserData(refreshedSession.user);
-              setUser(userData);
+              if (userData) {
+                setUser(userData);
+              } else {
+                // Fallback to auth user data if fetchUserData fails
+                const fallbackUser: User = {
+                  id: refreshedSession.user.id,
+                  email: refreshedSession.user.email || '',
+                  full_name: refreshedSession.user.user_metadata?.full_name || '',
+                  phone: undefined,
+                  role: 'member',
+                  membership_status: 'inactive',
+                  membership_start_date: undefined,
+                  membership_end_date: undefined,
+                  created_at: refreshedSession.user.created_at || new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                  email_verified: refreshedSession.user.email_confirmed_at !== null && refreshedSession.user.email_confirmed_at !== undefined,
+                };
+                setUser(fallbackUser);
+              }
             }
           } else if (session.user && mounted) {
             // Session is valid, fetch user data
             const userData = await fetchUserData(session.user);
-            setUser(userData);
+            if (userData) {
+              setUser(userData);
+            } else {
+              // Fallback to auth user data if fetchUserData fails
+              const fallbackUser: User = {
+                id: session.user.id,
+                email: session.user.email || '',
+                full_name: session.user.user_metadata?.full_name || '',
+                phone: undefined,
+                role: 'member',
+                membership_status: 'inactive',
+                membership_start_date: undefined,
+                membership_end_date: undefined,
+                created_at: session.user.created_at || new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                email_verified: session.user.email_confirmed_at !== null && session.user.email_confirmed_at !== undefined,
+              };
+              setUser(fallbackUser);
+            }
           }
         } else if (mounted) {
           // No session
@@ -164,10 +200,49 @@ export const useAuth = () => {
           setLoading(true);
           try {
             const userData = await fetchUserData(session.user);
-            setUser(userData);
+            // Always set user data, even if fetchUserData returns null (creates user from auth user)
+            // This prevents infinite loops when queries fail
+            if (userData) {
+              setUser(userData);
+            } else if (session.user) {
+              // If fetchUserData returns null, create a minimal user from auth user
+              // This allows login to complete even if profile/role queries fail
+              const fallbackUser: User = {
+                id: session.user.id,
+                email: session.user.email || '',
+                full_name: session.user.user_metadata?.full_name || '',
+                phone: undefined,
+                role: 'member',
+                membership_status: 'inactive',
+                membership_start_date: undefined,
+                membership_end_date: undefined,
+                created_at: session.user.created_at || new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                email_verified: session.user.email_confirmed_at !== null && session.user.email_confirmed_at !== undefined,
+              };
+              setUser(fallbackUser);
+            }
           } catch (error) {
             console.error('Error updating user data:', error);
-            setUser(null);
+            // Even on error, create a fallback user to prevent redirect loops
+            if (session.user) {
+              const fallbackUser: User = {
+                id: session.user.id,
+                email: session.user.email || '',
+                full_name: session.user.user_metadata?.full_name || '',
+                phone: undefined,
+                role: 'member',
+                membership_status: 'inactive',
+                membership_start_date: undefined,
+                membership_end_date: undefined,
+                created_at: session.user.created_at || new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                email_verified: session.user.email_confirmed_at !== null && session.user.email_confirmed_at !== undefined,
+              };
+              setUser(fallbackUser);
+            } else {
+              setUser(null);
+            }
           } finally {
             setLoading(false);
           }

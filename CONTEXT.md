@@ -510,11 +510,15 @@ Defined in `src/index.css`:
 3. Admin login checks `has_role()` RPC function
 4. `useAdminAuth` hook manages admin state and redirects
 5. `useAuth` hook manages user authentication and session
+   - **Fallback User Creation**: If profile/role queries fail, creates minimal user from auth user data to prevent redirect loops
+   - **Auth State Listener**: Automatically updates user data on SIGNED_IN, TOKEN_REFRESHED, and USER_UPDATED events
+   - **Error Handling**: Always creates user object even if database queries fail, ensuring login completes successfully
 6. `useSessionManager` hook monitors session expiration and shows warnings
 7. Session automatically refreshes on app load if expired
 8. Session warnings shown at 15 minutes and 5 minutes before expiration
 9. Email verification enforced via `ProtectedRoute` component
 10. Account lockout after 5 failed login attempts (15 minute lockout duration)
+11. **Login Flow**: After successful login, brief delay (100ms) before navigation to allow auth state to propagate
 
 ### Membership Flow
 1. User clicks "Register Membership" → `create-checkout` function
@@ -573,6 +577,19 @@ Defined in `src/index.css`:
     - Check that the Supabase project is active and accessible
     - Ensure the anon key matches the project's public anon key from Supabase Dashboard
   - **Security Note**: Exposing `public` schema is secure because RLS policies enforce row-level access control
+
+### Login Loading Loop Issues
+- **Symptom**: Login button shows loading spinner indefinitely after successful login
+- **Causes**:
+  1. `fetchUserData` queries are failing or hanging (e.g., 406 schema errors)
+  2. Auth state change listener sets loading but never completes
+  3. Race condition between login navigation and auth state updates
+- **Fixes Implemented**:
+  1. **Fallback User Creation**: `useAuth` hook now creates minimal user object from auth user data if `fetchUserData` fails, preventing redirect loops
+  2. **Error Handling**: Always ensures loading state is set to false, even when queries fail
+  3. **Navigation Delay**: Login page waits 100ms before navigation to allow auth state to propagate
+  4. **Graceful Degradation**: User can log in even if profile/role/membership queries fail temporarily
+- **Note**: After exposing `public` schema, these issues should resolve, but fallback handling ensures robust operation
 
 ## 🔍 Code Patterns
 
