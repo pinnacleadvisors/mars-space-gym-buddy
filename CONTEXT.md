@@ -87,7 +87,7 @@ mars-space-gym-buddy/
 │   │   ├── AdminUsers.tsx         # User management (✅ fully implemented with search, filtering, bulk actions, role management, activity history)
 │   │   ├── AdminAnalytics.tsx     # Analytics dashboard (✅ fully implemented with charts, date filtering, export)
 │   │   ├── AdminManageClasses.tsx # Class management (✅ includes session creation from templates)
-│   │   ├── AdminManageMemberships.tsx # Membership management
+│   │   ├── AdminManageMemberships.tsx # Membership management (✅ fully implemented with plan creation/editing, statistics, renewal reminders)
 │   │   ├── AdminUserMemberships.tsx   # User membership management
 │   │   └── NotFound.tsx           # 404 page
 │   └── types/                     # TypeScript type definitions
@@ -751,6 +751,38 @@ The AdminUsers page (`src/pages/AdminUsers.tsx`) includes:
 - **Error Handling**: Toast notifications for all operations
 
 **Note**: User suspension/activation requires additional database fields (e.g., `suspended` boolean in profiles table or a status field). Currently implemented as a placeholder.
+
+### Admin Membership Management Features
+The AdminManageMemberships page (`src/pages/AdminManageMemberships.tsx`) includes:
+- **Membership Plan Creation/Editing**:
+  - Create new membership plans with name, price, duration, and access level
+  - Edit existing membership plans
+  - Form validation using Zod schemas
+  - Delete membership plans (with validation to prevent deletion if assigned to users)
+  - Confirmation dialog for deletions
+- **Membership Assignment to Users**:
+  - Quick link to AdminUserMemberships page for assigning memberships
+  - Integration with user membership management
+- **Membership Statistics**:
+  - Total memberships count
+  - Active memberships count
+  - Expired memberships count
+  - Total revenue from paid memberships
+  - Membership plans available count
+  - Renewals due soon count
+- **Renewal Reminders**:
+  - Shows memberships expiring in the next 30 days
+  - Displays user name, membership name, expiration date, and days remaining
+  - Color-coded alerts (red for ≤7 days, orange for ≤14 days)
+  - Quick link to manage user membership
+  - Sorted by expiration date (soonest first)
+- **Tabbed Interface**: Organized into Plans, Statistics, and Renewal Reminders
+- **Real-time Data**: Fetches latest membership data and statistics
+- **Loading States**: Loading spinner during data fetch
+- **Error Handling**: Toast notifications for all operations
+- **Form Validation**: Comprehensive validation with helpful error messages
+
+**Note**: Membership assignment to users is handled via the AdminUserMemberships page (`/admin/usermemberships`), which provides full CRUD functionality for user memberships.
 
 ### Class Sessions Management
 The AdminManageClasses page (`src/pages/AdminManageClasses.tsx`) includes:

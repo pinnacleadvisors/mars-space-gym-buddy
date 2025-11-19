@@ -311,11 +311,11 @@ This roadmap outlines all tasks needed to make the application fully functional.
   - [x] Add user role management UI
   - [x] Implement user suspension/activation (placeholder - requires additional database fields)
 
-- [ ] **Membership Management**
-  - [ ] Add membership plan creation/editing
-  - [ ] Implement membership assignment to users
-  - [ ] Show membership statistics
-  - [ ] Add membership renewal reminders
+- [x] **Membership Management**
+  - [x] Add membership plan creation/editing
+  - [x] Implement membership assignment to users (via AdminUserMemberships page)
+  - [x] Show membership statistics
+  - [x] Add membership renewal reminders
 
 - [ ] **Class Management**
   - [ ] Improve class session creation UI
