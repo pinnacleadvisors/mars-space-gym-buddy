@@ -5,10 +5,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { getFullRedirectUrl } from "@/lib/utils/pathUtils";
 
 const EmailVerificationRequired = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [isResending, setIsResending] = useState(false);
 
   const handleResendVerification = async () => {
@@ -20,7 +23,7 @@ const EmailVerificationRequired = () => {
         type: 'signup',
         email: user.email,
         options: {
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: getFullRedirectUrl('/dashboard'),
         },
       });
 
@@ -88,7 +91,7 @@ const EmailVerificationRequired = () => {
               variant="outline"
               onClick={async () => {
                 await supabase.auth.signOut();
-                window.location.href = "/login";
+                navigate("/login");
               }}
               className="w-full"
             >

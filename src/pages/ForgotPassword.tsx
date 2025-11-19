@@ -7,6 +7,7 @@ import { Dumbbell, ArrowLeft } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
+import { getFullRedirectUrl } from "@/lib/utils/pathUtils";
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ const ForgotPassword = () => {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: getFullRedirectUrl('/reset-password'),
       });
 
       if (error) throw error;

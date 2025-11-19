@@ -15,12 +15,14 @@ import { registerSchema, type RegisterFormData } from "@/lib/validations/auth";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { sanitizeEmail, sanitizeString } from "@/lib/utils/sanitize";
+import { getFullRedirectUrl } from "@/lib/utils/pathUtils";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -55,7 +57,7 @@ const Register = () => {
           data: {
             full_name: sanitizedFullName,
           },
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: getFullRedirectUrl('/dashboard'),
         },
       });
 
@@ -106,7 +108,7 @@ const Register = () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: getFullRedirectUrl('/dashboard'),
       },
     });
 

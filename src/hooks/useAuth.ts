@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { User } from '@/types/user';
 import { supabase } from '@/integrations/supabase/client';
+import { getFullRedirectUrl } from '@/lib/utils/pathUtils';
 
 /**
  * Custom hook for authentication management
@@ -244,7 +245,7 @@ export const useAuth = () => {
           data: {
             full_name: fullName,
           },
-          emailRedirectTo: `${window.location.origin}/dashboard`,
+          emailRedirectTo: getFullRedirectUrl('/dashboard'),
         },
       });
 

@@ -27,6 +27,7 @@ import {
   formatLockoutTime,
   getRemainingAttempts 
 } from "@/lib/utils/accountLockout";
+import { getFullRedirectUrl } from "@/lib/utils/pathUtils";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const Login = () => {
@@ -151,7 +152,7 @@ const Login = () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: getFullRedirectUrl('/dashboard'),
       },
     });
 
