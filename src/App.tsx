@@ -15,8 +15,7 @@ import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Classes from "./pages/Classes";
 import Bookings from "./pages/Bookings";
-import QREntry from "./pages/QREntry";
-import QRExitPage from "./pages/QRExitPage";
+import EntryExit from "./pages/EntryExit";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminUsers from "./pages/AdminUsers";
 import AdminAnalytics from "./pages/AdminAnalytics";
@@ -78,18 +77,10 @@ const App = () => (
               }
             />
             <Route
-              path="/qr/entry"
+              path="/qr/entry-exit"
               element={
                 <ProtectedRoute>
-                  <QREntry />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/qr/exit"
-              element={
-                <ProtectedRoute>
-                  <QRExitPage />
+                  <EntryExit />
                 </ProtectedRoute>
               }
             />

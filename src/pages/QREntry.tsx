@@ -5,6 +5,10 @@ import { QrCode, LogIn, MapPin, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAuth } from "@/hooks/useAuth";
+import { QRCodeDisplay } from "@/components/qr/QRCodeDisplay";
+import { QRCodeScanner } from "@/components/qr/QRCodeScanner";
+import { decodeQRCodeData, isQRCodeValid, type QRCodeData } from "@/lib/utils/qrCode";
 
 const TARGET_LAT = 51.4981;
 const TARGET_LNG = -0.0544;
@@ -30,7 +34,9 @@ const QREntry = () => {
   const [isChecking, setIsChecking] = useState(false);
   const [hasMembership, setHasMembership] = useState<boolean | null>(null);
   const [membershipChecking, setMembershipChecking] = useState(true);
+  const [showScanner, setShowScanner] = useState(false);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     checkMembership();
@@ -196,22 +202,73 @@ const QREntry = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="aspect-square bg-muted rounded-lg flex items-center justify-center">
-            <div className="text-center p-8">
-              <QrCode className="w-32 h-32 mx-auto text-muted-foreground mb-4" />
-              <p className="text-sm text-muted-foreground">QR Scanner Placeholder</p>
-            </div>
-          </div>
-          
-          <Button 
-            className="w-full bg-secondary hover:bg-secondary/90" 
-            size="lg"
-            onClick={handleCheckIn}
-            disabled={locationStatus !== "valid" || isChecking || !hasMembership || membershipChecking}
-          >
-            <LogIn className="w-5 h-5 mr-2" />
-            Manual Check In
-          </Button>
+          {showScanner ? (
+            <QRCodeScanner
+              onScan={(qrData: QRCodeData) => {
+                // Validate QR code
+                if (!isQRCodeValid(qrData)) {
+                  toast({
+                    variant: "destructive",
+                    title: "QR Code Expired",
+                    description: "This QR code has expired. Please generate a new one.",
+                  });
+                  return;
+                }
+                
+                if (qrData.action !== 'entry') {
+                  toast({
+                    variant: "destructive",
+                    title: "Invalid QR Code",
+                    description: "This QR code is for check-out, not check-in.",
+                  });
+                  return;
+                }
+                
+                // Auto check-in when QR code is scanned
+                handleCheckIn();
+                setShowScanner(false);
+              }}
+              onError={(error) => {
+                toast({
+                  variant: "destructive",
+                  title: "Scanning Error",
+                  description: error,
+                });
+              }}
+            />
+          ) : (
+            <>
+              {user && (
+                <QRCodeDisplay
+                  userId={user.id}
+                  action="entry"
+                  size={250}
+                  className="max-w-sm mx-auto"
+                />
+              )}
+              <div className="flex gap-2">
+                <Button 
+                  className="flex-1 bg-secondary hover:bg-secondary/90" 
+                  size="lg"
+                  onClick={() => setShowScanner(true)}
+                  disabled={!hasMembership || membershipChecking}
+                >
+                  <QrCode className="w-5 h-5 mr-2" />
+                  Scan QR Code
+                </Button>
+                <Button 
+                  variant="outline"
+                  className="flex-1" 
+                  size="lg"
+                  onClick={handleCheckIn}
+                  disabled={locationStatus !== "valid" || isChecking || !hasMembership || membershipChecking}
+                >
+                  <LogIn className="w-5 h-5 mr-2" />
+                  Manual Check In
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

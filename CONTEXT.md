@@ -33,6 +33,9 @@ mars-space-gym-buddy/
 │   │       ├── ChartSkeleton.tsx   # Chart skeleton loader
 │   │       ├── LoadingSpinner.tsx  # Reusable loading spinner
 │   │       └── ProgressIndicator.tsx # Progress indicator component
+│   │   └── qr/                    # QR code components
+│   │       ├── QRCodeDisplay.tsx  # QR code display component
+│   │       └── QRCodeScanner.tsx  # QR code scanner component
 │   ├── hooks/                     # Custom React hooks
 │   │   ├── useAuth.ts             # Authentication hook (✅ implemented)
 │   │   ├── useAdminAuth.ts        # Admin authentication hook
@@ -59,7 +62,8 @@ mars-space-gym-buddy/
 │   │       ├── errorLogger.ts     # Error logging utility
 │   │       ├── errorHandler.ts    # Global error handling utility
 │   │       ├── networkErrorHandler.ts # Network error handling utility
-│   │       └── toastHelpers.ts    # Toast notification helpers
+│   │       ├── toastHelpers.ts    # Toast notification helpers
+│   │       └── qrCode.ts          # QR code generation utilities
 │   ├── lib/
 │   │   └── validations/          # Zod validation schemas
 │   │       ├── auth.ts            # Authentication form schemas
@@ -76,8 +80,7 @@ mars-space-gym-buddy/
 │   │   ├── Classes.tsx            # Class listings (✅ fully implemented with booking, filters, search)
 │   │   ├── Bookings.tsx           # User bookings (✅ fully implemented with list/calendar views, cancel functionality)
 │   │   ├── ManageMemberships.tsx  # Membership management
-│   │   ├── QREntry.tsx            # QR code check-in
-│   │   ├── QRExitPage.tsx         # QR code check-out
+│   │   ├── EntryExit.tsx          # Combined QR code check-in/check-out
 │   │   ├── AdminLogin.tsx         # Admin login
 │   │   ├── AdminDashboard.tsx     # Admin dashboard
 │   │   ├── AdminUsers.tsx         # User management
@@ -363,8 +366,7 @@ Used in `.github/workflows/github-actions-demo.yml`:
 - `/classes` - Browse classes
 - `/bookings` - View/manage bookings
 - `/managememberships` - Membership management
-- `/qr/entry` - QR check-in (requires valid membership + location)
-- `/qr/exit` - QR check-out (requires active check-in + location)
+- `/qr/entry-exit` - QR check-in/check-out (requires valid membership + location, toggles between entry and exit based on active check-in status)
 
 **Note**: All authenticated routes are wrapped with `ProtectedRoute` component which:
 - Checks if user is authenticated
@@ -1186,11 +1188,107 @@ const form = useForm<FormData>({
 - ✅ Register page: Full name, email, password, and confirm password validation with helpful descriptions
 - ✅ All forms: Submit buttons disabled when form has errors or is submitting
 
+### QR Code Generation
+The application implements comprehensive QR code generation and scanning functionality:
+
+**QR Code Utilities (`src/lib/utils/qrCode.ts`):**
+- `generateQRCodeData()`: Creates QR code data object with user ID, timestamp, and action
+- `encodeQRCodeData()`: Converts QR code data to JSON string
+- `decodeQRCodeData()`: Parses JSON string back to QR code data
+- `generateQRCodeImage()`: Generates QR code as data URL (PNG image)
+- `generateQRCodeSVG()`: Generates QR code as SVG string
+- `isQRCodeValid()`: Validates QR code expiration (default: 5 minutes)
+
+**QR Code Data Structure:**
+```typescript
+interface QRCodeData {
+  userId: string;
+  timestamp: number;
+  action: 'entry' | 'exit';
+  sessionId?: string; // Optional for unique QR codes
+}
+```
+
+**QR Code Display Component (`src/components/qr/QRCodeDisplay.tsx`):**
+- Displays QR code image with user-specific data
+- Supports entry and exit QR codes
+- Download functionality for saving QR codes
+- Refresh functionality to generate new QR codes
+- Loading and error states
+- Configurable size and styling
+
+**QR Code Scanner Component (`src/components/qr/QRCodeScanner.tsx`):**
+- Uses `html5-qrcode` library for camera-based scanning
+- Automatic QR code detection and validation
+- Camera permission handling
+- Manual entry fallback option
+- Validates QR code expiration and action type
+- Error handling for camera access issues
+
+**QR Code Features:**
+- ✅ Unique QR codes per user with timestamp
+- ✅ Optional session ID for unique QR codes per session
+- ✅ QR code expiration validation (5 minutes default)
+- ✅ Action-specific QR codes (entry vs exit)
+- ✅ Camera-based scanning with html5-qrcode library
+- ✅ Manual entry fallback for QR code data
+- ✅ Download QR codes as PNG images
+- ✅ Refresh to generate new QR codes
+
+**QR Code Usage:**
+```typescript
+import { QRCodeDisplay } from '@/components/qr/QRCodeDisplay';
+import { QRCodeScanner } from '@/components/qr/QRCodeScanner';
+import { generateQRCodeData, generateQRCodeImage } from '@/lib/utils/qrCode';
+
+// Display QR code
+<QRCodeDisplay
+  userId={user.id}
+  action="entry"
+  title="Your Check-In QR Code"
+  size={250}
+/>
+
+// Scan QR code
+<QRCodeScanner
+  onScan={(qrData) => {
+    // Handle scanned QR code
+    if (qrData.action === 'entry') {
+      // Process check-in
+    }
+  }}
+  onError={(error) => {
+    // Handle scanning errors
+  }}
+/>
+
+// Generate QR code programmatically
+const qrData = generateQRCodeData(userId, 'entry');
+const qrImageUrl = await generateQRCodeImage(qrData);
+```
+
+**Pages with QR Code Functionality:**
+- ✅ Dashboard: Displays user's check-in QR code
+- ✅ EntryExit page (`/qr/entry-exit`): Combined check-in/check-out page that:
+  - Shows entry QR code when user has no active check-in
+  - Shows exit QR code when user has an active check-in
+  - Automatically toggles between entry and exit based on check-in status
+  - Includes QR scanner for both entry and exit actions
+  - Validates location (Grinstead Rd, London SE8 5FE, United Kingdom)
+- ✅ All QR codes are user-specific and time-limited
+
+**QR Code Security:**
+- QR codes include user ID and timestamp
+- QR codes expire after 5 minutes (configurable)
+- QR codes are validated before processing
+- Action type (entry/exit) is validated
+- Manual entry option for accessibility
+
 ## 📚 Additional Resources
 
 - **Supabase Project ID**: `yggvabrltcxvkiyjixdv`
 - **Stripe Price ID**: `price_1STEriRpTziRf7OxCPXLGPLw` (£150/month)
-- **Target Location**: SE16 2RW, London (51.4981, -0.0544)
+- **Target Location**: Grinstead Rd, London SE8 5FE, United Kingdom (51.4881, -0.0300)
 - **Max Distance**: 100 meters for check-in/check-out
 - **GitHub Pages**: `https://pinnacleadvisors.github.io/mars-space-gym-buddy/`
 

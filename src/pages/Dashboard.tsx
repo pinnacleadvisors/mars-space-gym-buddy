@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Calendar, Dumbbell, TrendingUp, Users } from "lucide-react";
+import { Calendar, Dumbbell, TrendingUp, Users, QrCode } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { QRCodeDisplay } from "@/components/qr/QRCodeDisplay";
 
 interface CheckIn {
   id: string;
@@ -28,6 +30,7 @@ const Dashboard = () => {
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   const fetchDashboardData = async () => {
     try {
@@ -134,6 +137,20 @@ const Dashboard = () => {
             trend="Premium Plan"
           />
         </div>
+
+        {/* QR Code & Quick Actions */}
+        {user && (
+          <div className="mb-8">
+            <QRCodeDisplay
+              userId={user.id}
+              action="entry"
+              title="Your Check-In QR Code"
+              description="Show this QR code at the gym entrance for quick check-in"
+              size={250}
+              className="max-w-md mx-auto"
+            />
+          </div>
+        )}
 
         {/* Upcoming Classes & Activity */}
         <div className="grid lg:grid-cols-2 gap-6">

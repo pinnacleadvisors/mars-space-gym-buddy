@@ -1,6 +1,5 @@
 const quickActions = [
-    { icon: QrCode, label: "QR Entry", path: "/qr/entry" },
-    { icon: QrCode, label: "QR Exit", path: "/qr/exit" }
+    { icon: QrCode, label: "Entry/Exit", path: "/qr/entry-exit" }
   ];
   
 "use client";

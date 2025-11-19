@@ -249,22 +249,25 @@ This roadmap outlines all tasks needed to make the application fully functional.
 ## 🎨 Phase 4: User Experience Enhancements (Priority: MEDIUM)
 
 ### 4.1 QR Code Functionality
-**Status**: ⚠️ Partially Implemented  
-**Files**: `src/pages/QREntry.tsx`, `src/pages/QRExitPage.tsx`
+**Status**: ✅ Implemented  
+**Files**: `src/pages/EntryExit.tsx`
 
 #### Tasks:
-- [ ] **QR Code Generation**
-  - [ ] Implement actual QR code generation (use `qrcode` library)
-  - [ ] Generate unique QR codes per user/session
-  - [ ] Add QR code display in user dashboard
-  - [ ] Implement QR code scanning (camera API)
+- [x] **QR Code Generation**
+  - [x] Implement actual QR code generation (use `qrcode` library)
+  - [x] Generate unique QR codes per user/session
+  - [x] Add QR code display in user dashboard
+  - [x] Implement QR code scanning (camera API)
 
-- [ ] **Check-in/Check-out Improvements**
-  - [ ] Add QR code scanning capability
-  - [ ] Improve location accuracy
-  - [ ] Add location history
-  - [ ] Show check-in/check-out history
-  - [ ] Add manual override for admins
+- [x] **Check-in/Check-out Improvements**
+  - [x] Add QR code scanning capability
+  - [x] Combine entry and exit pages into single EntryExit page
+  - [x] Implement automatic QR code toggle based on check-in status
+  - [x] Update target location to Grinstead Rd, London SE8 5FE, United Kingdom
+  - [ ] Improve location accuracy (optional)
+  - [ ] Add location history (optional)
+  - [ ] Show check-in/check-out history (optional)
+  - [ ] Add manual override for admins (optional)
 
 **Dependencies**: QR code library installation  
 **Estimated Effort**: 2-3 days
