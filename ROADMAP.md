@@ -223,11 +223,11 @@ This roadmap outlines all tasks needed to make the application fully functional.
   - [x] Handle network errors gracefully
   - [x] Handle Supabase errors consistently
 
-- [ ] **Loading States**
-  - [ ] Add loading skeletons for all data fetches
-  - [ ] Implement optimistic UI updates where appropriate
-  - [ ] Add progress indicators for long operations
-  - [ ] Show loading states during navigation
+- [x] **Loading States**
+  - [x] Add loading skeletons for all data fetches
+  - [x] Implement optimistic UI updates where appropriate
+  - [x] Add progress indicators for long operations
+  - [x] Show loading states during navigation
 
 - [ ] **Toast Notifications**
   - [ ] Standardize toast usage across app

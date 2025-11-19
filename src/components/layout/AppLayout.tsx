@@ -4,6 +4,7 @@ import { BottomNav } from "./BottomNav";
 import { AppSidebar } from "./AppSidebar";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { useSessionManager } from "@/hooks/useSessionManager";
+import { NavigationLoadingIndicator } from "@/hooks/useNavigationLoading";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -15,6 +16,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <SidebarProvider>
+      <NavigationLoadingIndicator />
       <div className="relative flex min-h-screen w-full">
         <div className="hidden md:block">
           <AppSidebar />

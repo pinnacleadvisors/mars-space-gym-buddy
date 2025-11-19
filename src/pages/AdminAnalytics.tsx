@@ -295,9 +295,25 @@ const AdminAnalytics = () => {
         </Card>
 
         {loading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
+          <>
+            {/* Metric Cards Skeletons */}
+            <div className="grid lg:grid-cols-4 gap-6 mb-8">
+              {[1, 2, 3, 4].map((i) => (
+                <Card key={i}>
+                  <CardContent className="p-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <Skeleton className="h-4 w-24" />
+                      <Skeleton className="h-5 w-5 rounded" />
+                    </div>
+                    <Skeleton className="h-10 w-20 mb-2" />
+                    <Skeleton className="h-3 w-32" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            {/* Charts Skeletons */}
+            <ChartSkeletons count={4} />
+          </>
         ) : (
           <>
             {/* Metric Cards */}
@@ -307,28 +323,28 @@ const AdminAnalytics = () => {
                 value={data?.total_members?.toString() || "0"}
                 description={`${data?.active_members || 0} active members`}
                 icon={<Users className="w-5 h-5 text-primary" />}
-                loading={loading}
+                loading={false}
               />
               <MetricCard
                 title="Member Growth"
                 value={memberGrowth ? `${memberGrowth.growthPercentage >= 0 ? '+' : ''}${memberGrowth.growthPercentage.toFixed(1)}%` : "0%"}
                 description={`${memberGrowth?.growthThisMonth || 0} new this month`}
                 icon={<TrendingUp className="w-5 h-5 text-success" />}
-                loading={loading}
+                loading={false}
               />
               <MetricCard
                 title="Class Attendance"
                 value={`${attendanceRate}%`}
                 description="Average rate"
                 icon={<CalendarIcon className="w-5 h-5 text-secondary" />}
-                loading={loading}
+                loading={false}
               />
               <MetricCard
                 title="Visits Today"
                 value={data?.total_visits_today?.toString() || "0"}
                 description="Total check-ins today"
                 icon={<TrendingUp className="w-5 h-5 text-accent" />}
-                loading={loading}
+                loading={false}
               />
             </div>
 

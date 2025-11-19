@@ -28,6 +28,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useBookings } from "@/hooks/useBookings";
 import { format, parseISO, isAfter, isBefore, startOfToday } from "date-fns";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ClassCardSkeletons } from "@/components/loading/ClassCardSkeleton";
 
 interface ClassSession {
   id: string;
@@ -229,8 +231,16 @@ const Classes = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-7xl mx-auto space-y-6">
+          <Skeleton className="h-10 w-64" />
+          <div className="flex gap-4 mb-4">
+            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-40" />
+          </div>
+          <ClassCardSkeletons count={6} />
+        </div>
       </div>
     );
   }

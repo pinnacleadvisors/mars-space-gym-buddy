@@ -169,8 +169,15 @@ const Bookings = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-background p-6">
+        <div className="container mx-auto max-w-7xl">
+          <Skeleton className="h-10 w-48 mb-8" />
+          <div className="flex gap-4 mb-6">
+            <Skeleton className="h-10 w-32" />
+            <Skeleton className="h-10 w-32" />
+          </div>
+          <BookingCardSkeletons count={4} />
+        </div>
       </div>
     );
   }

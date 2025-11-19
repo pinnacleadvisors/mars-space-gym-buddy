@@ -25,6 +25,14 @@ mars-space-gym-buddy/
 │   │       └── AdminRoute.tsx     # Route protection for admin users
 │   │   └── error/                 # Error handling components
 │   │       └── ErrorBoundary.tsx  # React error boundary component
+│   │   └── loading/               # Loading state components
+│   │       ├── PageSkeleton.tsx   # Full page skeleton loader
+│   │       ├── ClassCardSkeleton.tsx # Class card skeleton
+│   │       ├── BookingCardSkeleton.tsx # Booking card skeleton
+│   │       ├── TableSkeleton.tsx  # Table skeleton loader
+│   │       ├── ChartSkeleton.tsx   # Chart skeleton loader
+│   │       ├── LoadingSpinner.tsx  # Reusable loading spinner
+│   │       └── ProgressIndicator.tsx # Progress indicator component
 │   ├── hooks/                     # Custom React hooks
 │   │   ├── useAuth.ts             # Authentication hook (✅ implemented)
 │   │   ├── useAdminAuth.ts        # Admin authentication hook
@@ -32,6 +40,7 @@ mars-space-gym-buddy/
 │   │   ├── useBookings.ts         # Bookings hook (✅ implemented)
 │   │   ├── useAnalytics.ts        # Analytics hook (✅ implemented)
 │   │   ├── useErrorHandler.ts     # Error handling hook (✅ implemented)
+│   │   ├── useNavigationLoading.ts # Navigation loading hook (✅ implemented)
 │   │   ├── use-mobile.tsx         # Mobile detection hook
 │   │   └── use-toast.ts           # Toast notification hook
 │   ├── integrations/
@@ -927,6 +936,73 @@ const MyComponent = () => {
   };
 };
 ```
+
+### Loading States
+The application implements comprehensive loading states for better user experience:
+
+**Loading Skeleton Components:**
+- `PageSkeleton`: Full page skeleton loader with grid layout
+- `ClassCardSkeleton`: Skeleton for class cards (single and multiple)
+- `BookingCardSkeleton`: Skeleton for booking cards (single and multiple)
+- `TableSkeleton`: Skeleton for data tables with configurable columns/rows
+- `ChartSkeleton`: Skeleton for charts (single and multiple)
+- `LoadingSpinner`: Reusable loading spinner with size variants (sm, md, lg)
+- `ProgressIndicator`: Progress indicator for long-running operations
+
+**Loading Spinner Variants:**
+- `PageLoadingSpinner`: Full page centered spinner
+- `InlineLoadingSpinner`: Small inline spinner
+- `LoadingSpinner`: Configurable spinner with text
+
+**Progress Indicators:**
+- `ProgressIndicator`: Card-based progress indicator with percentage
+- `PageProgressIndicator`: Full page progress indicator
+- Supports progress percentage, messages, and spinner
+
+**Navigation Loading:**
+- `useNavigationLoading`: Hook to detect navigation state
+- `NavigationLoadingIndicator`: Top bar loading indicator during route changes
+- Integrated into `AppLayout` for automatic navigation loading states
+
+**Loading State Features:**
+- ✅ Skeleton loaders for all major data fetches (Classes, Bookings, Analytics)
+- ✅ Optimistic UI updates in booking operations (immediate feedback)
+- ✅ Progress indicators for long operations
+- ✅ Navigation loading indicator at top of page
+- ✅ Consistent loading patterns across all pages
+- ✅ Smooth transitions between loading and loaded states
+- ✅ Loading states match actual content layout
+
+**Usage Examples:**
+```typescript
+// Using skeleton loaders
+import { ClassCardSkeletons } from '@/components/loading/ClassCardSkeleton';
+
+if (loading) {
+  return <ClassCardSkeletons count={6} />;
+}
+
+// Using loading spinner
+import { LoadingSpinner } from '@/components/loading/LoadingSpinner';
+
+<LoadingSpinner size="md" text="Loading data..." />
+
+// Using progress indicator
+import { ProgressIndicator } from '@/components/loading/ProgressIndicator';
+
+<ProgressIndicator 
+  progress={75} 
+  message="Processing your request..." 
+  title="Uploading"
+/>
+```
+
+**Pages with Loading States:**
+- ✅ Classes page: Class card skeletons
+- ✅ Bookings page: Booking card skeletons
+- ✅ Admin Analytics: Chart and metric card skeletons
+- ✅ All protected routes: Navigation loading indicator
+- ✅ All forms: Button loading states during submission
 
 ## 📚 Additional Resources
 
