@@ -320,6 +320,16 @@ Located in `.env` files (not in repo, use GitHub Secrets for CI/CD):
   - URL is cleaned to remove trailing slashes before creating client
   - Uses default schema (no explicit schema specification needed)
 
+### Supabase API Settings (Dashboard Configuration)
+Located in Supabase Dashboard → Settings → API:
+- **Exposed schemas**: Must include `public` (required for application to work)
+  - Tables, views, and stored procedures in exposed schemas get API endpoints
+  - Default should include: `api`, `public`
+  - **Note**: Even if `public` schema is not exposed, it's still accessible via GraphQL endpoints, but not via REST API (supabase-js uses REST API)
+- **Extra search path**: Should include `public`, `extensions`
+  - Adds these schemas to the search path of every request
+- **Max rows**: Maximum rows returned from views/tables/stored procedures (prevents large payloads)
+
 ### Supabase Edge Functions Environment Variables
 Set in Supabase Dashboard → Project Settings → Edge Functions:
 - `SUPABASE_URL` - Supabase project URL
@@ -542,14 +552,27 @@ Defined in `src/index.css`:
 - Use `has_role()` function for admin checks
 - Users can only access their own data unless admin
 
+### Supabase API Configuration (Critical)
+- **Exposed Schemas**: Must include `public` in the exposed schemas list
+  - Location: Supabase Dashboard → Settings → API → Exposed schemas
+  - Required: Add `public` to the list (should have both `api` and `public`)
+  - Why: All database tables are in the `public` schema, so it must be exposed for queries to work
+  - Security: Exposing `public` schema is safe because RLS policies protect all data
+  - Without this: All queries will fail with 406 error "The schema must be one of the following: api"
+- **Extra Search Path**: Should include `public` and `extensions`
+  - This allows queries to work without explicitly specifying the schema
+- **Max Rows**: Recommended limit (default is usually 1000) to prevent large payload responses
+
 ### Supabase Client Configuration Issues
-- **406 Error "The schema must be one of the following: api"**: This typically indicates:
-  - The Supabase URL might be incorrect or missing the proper path
-  - The client might need explicit schema configuration (`db.schema: 'public'`)
-  - Ensure the URL doesn't have a trailing slash
-  - Verify environment variables are set correctly (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`)
-  - Check that the Supabase project is active and accessible
-  - Ensure the anon key matches the project's public anon key from Supabase Dashboard
+- **406 Error "The schema must be one of the following: api"**: 
+  - **Primary Cause**: `public` schema is not in the "Exposed schemas" list in Supabase Dashboard
+  - **Solution**: Add `public` to Exposed schemas in Dashboard → Settings → API
+  - **Secondary checks if issue persists**:
+    - Ensure the Supabase URL doesn't have a trailing slash (automatically cleaned in client.ts)
+    - Verify environment variables are set correctly (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`)
+    - Check that the Supabase project is active and accessible
+    - Ensure the anon key matches the project's public anon key from Supabase Dashboard
+  - **Security Note**: Exposing `public` schema is secure because RLS policies enforce row-level access control
 
 ## 🔍 Code Patterns
 
@@ -686,7 +709,6 @@ The Landing page (`src/pages/Landing.tsx`) includes:
 - **Design principles**: Generous spacing, strong visual hierarchy, premium typography, clean layout, muted luxury color palette
 - **Responsive design**: Adapts to mobile, tablet, and desktop screen sizes
 - **Navigation**: Log in button navigates to `/login`, Join button navigates to `/register`
-- **No App Navigation**: Renders without TopBar, BottomNav, or Sidebar (public route)
 - **No App Navigation**: Renders without TopBar, BottomNav, or Sidebar (public route)
 
 ### Classes Page Features
