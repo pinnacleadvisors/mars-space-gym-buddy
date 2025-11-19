@@ -313,8 +313,12 @@ Located in `.env` files (not in repo, use GitHub Secrets for CI/CD):
 - `VITE_SUPABASE_ANON_KEY` - Supabase anonymous/public key
 
 **Current fallback values** (in `src/integrations/supabase/client.ts`):
-- URL: `https://yggvabrltcxvkiyjixdv.supabase.co`
+- URL: `https://yggvabrltcxvkiyjixdv.supabase.co` (trailing slash removed automatically)
 - Anon Key: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` (hardcoded fallback)
+- **Client Configuration**: 
+  - Auth: Uses localStorage, auto-refresh enabled, persist session
+  - URL is cleaned to remove trailing slashes before creating client
+  - Uses default schema (no explicit schema specification needed)
 
 ### Supabase Edge Functions Environment Variables
 Set in Supabase Dashboard → Project Settings → Edge Functions:
@@ -537,6 +541,15 @@ Defined in `src/index.css`:
 - All tables have RLS enabled
 - Use `has_role()` function for admin checks
 - Users can only access their own data unless admin
+
+### Supabase Client Configuration Issues
+- **406 Error "The schema must be one of the following: api"**: This typically indicates:
+  - The Supabase URL might be incorrect or missing the proper path
+  - The client might need explicit schema configuration (`db.schema: 'public'`)
+  - Ensure the URL doesn't have a trailing slash
+  - Verify environment variables are set correctly (`VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`)
+  - Check that the Supabase project is active and accessible
+  - Ensure the anon key matches the project's public anon key from Supabase Dashboard
 
 ## 🔍 Code Patterns
 
