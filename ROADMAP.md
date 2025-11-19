@@ -304,12 +304,12 @@ This roadmap outlines all tasks needed to make the application fully functional.
 **Status**: ⚠️ Basic Implementation
 
 #### Tasks:
-- [ ] **User Management**
-  - [ ] Implement user search and filtering
-  - [ ] Add bulk actions for users
-  - [ ] Show user activity history
-  - [ ] Add user role management UI
-  - [ ] Implement user suspension/activation
+- [x] **User Management**
+  - [x] Implement user search and filtering
+  - [x] Add bulk actions for users
+  - [x] Show user activity history
+  - [x] Add user role management UI
+  - [x] Implement user suspension/activation (placeholder - requires additional database fields)
 
 - [ ] **Membership Management**
   - [ ] Add membership plan creation/editing

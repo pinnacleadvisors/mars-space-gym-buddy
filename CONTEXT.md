@@ -84,7 +84,7 @@ mars-space-gym-buddy/
 │   │   ├── EntryExit.tsx          # Combined QR code check-in/check-out
 │   │   ├── AdminLogin.tsx         # Admin login
 │   │   ├── AdminDashboard.tsx     # Admin dashboard
-│   │   ├── AdminUsers.tsx         # User management
+│   │   ├── AdminUsers.tsx         # User management (✅ fully implemented with search, filtering, bulk actions, role management, activity history)
 │   │   ├── AdminAnalytics.tsx     # Analytics dashboard (✅ fully implemented with charts, date filtering, export)
 │   │   ├── AdminManageClasses.tsx # Class management (✅ includes session creation from templates)
 │   │   ├── AdminManageMemberships.tsx # Membership management
@@ -707,6 +707,50 @@ The Bookings page (`src/pages/Bookings.tsx`) includes:
 - **Smart sorting**: Upcoming sorted by earliest first, past sorted by most recent first
 - **Cancel validation**: Only shows cancel button when cancellation is allowed (24+ hours before class)
 - **Error handling**: Toast notifications for all booking operations
+
+### Admin User Management Features
+The AdminUsers page (`src/pages/AdminUsers.tsx`) includes:
+- **User Search and Filtering**:
+  - Search by name, user ID, or phone number
+  - Filter by role (Admin, Staff, Member, All)
+  - Filter by membership status (Active, Expired, None, All)
+  - Real-time filtering as you type
+- **Bulk Actions**:
+  - Select multiple users with checkboxes
+  - Select all / deselect all functionality
+  - Bulk role changes (set multiple users to admin/staff/member)
+  - Clear selection button
+- **User Activity History**:
+  - View detailed activity for each user
+  - Shows recent check-ins and bookings
+  - Displays activity type, description, and timestamp
+  - Last activity date shown in main table
+- **User Role Management**:
+  - Edit individual user roles via dialog
+  - Role badges with icons (Admin, Staff, Member)
+  - Bulk role assignment for multiple users
+  - Role changes saved to `user_roles` table
+- **User Statistics**:
+  - Total visits count per user
+  - Total bookings count per user
+  - Membership status display
+  - Member since date (from created_at)
+- **User Table**:
+  - Sortable table with all user information
+  - User name, ID, phone number
+  - Role and membership status badges
+  - Last activity timestamp
+  - Quick actions dropdown menu
+- **Actions Menu**:
+  - View Activity: Opens activity history dialog
+  - Edit Role: Opens role edit dialog
+  - View Profile: Navigate to user profile
+  - Suspend User: Placeholder for suspension (requires additional database fields)
+- **Real-time Data**: Fetches latest user data, roles, memberships, and activity
+- **Loading States**: Loading spinner during data fetch
+- **Error Handling**: Toast notifications for all operations
+
+**Note**: User suspension/activation requires additional database fields (e.g., `suspended` boolean in profiles table or a status field). Currently implemented as a placeholder.
 
 ### Class Sessions Management
 The AdminManageClasses page (`src/pages/AdminManageClasses.tsx`) includes:
