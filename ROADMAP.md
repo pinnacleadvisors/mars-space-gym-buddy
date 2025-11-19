@@ -300,7 +300,29 @@ This roadmap outlines all tasks needed to make the application fully functional.
 
 ---
 
-### 4.3 Admin Panel Enhancements
+### 4.3 Landing Page Design
+**Status**: ✅ Implemented  
+**Files**: `src/pages/Landing.tsx`
+
+#### Tasks:
+- [x] **High-end welcome/onboarding screen**
+  - [x] Implement full-screen hero background image (`hero-background.jpg`)
+  - [x] Add centered logo (`earth-space-logo-9.webp`) near the top
+  - [x] Create large serif headline "Welcome to Earth Space" in white
+  - [x] Add paragraph of white sans-serif body text describing features
+  - [x] Implement two horizontally aligned pill-shaped buttons at the bottom
+    - [x] Primary: Solid white button labeled "LOG IN" with black text
+    - [x] Secondary: White outline button labeled "JOIN EARTH SPACE" with white text
+  - [x] Apply premium typography, generous spacing, and clean layout
+  - [x] Ensure responsive design for mobile, tablet, and desktop
+  - [x] Add overlay for better text readability over background image
+
+**Dependencies**: None  
+**Estimated Effort**: 1 day
+
+---
+
+### 4.4 Admin Panel Enhancements
 **Status**: ⚠️ Basic Implementation
 
 #### Tasks:

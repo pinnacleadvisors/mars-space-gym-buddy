@@ -70,7 +70,7 @@ mars-space-gym-buddy/
 │   │       ├── class.ts           # Class and session schemas
 │   │       └── membership.ts      # Membership schemas
 │   ├── pages/                     # Page components
-│   │   ├── Landing.tsx            # Landing page
+│   │   ├── Landing.tsx            # Landing page (high-end welcome/onboarding screen with hero background, logo, premium typography)
 │   │   ├── Login.tsx              # User login
 │   │   ├── Register.tsx           # User registration
 │   │   ├── ForgotPassword.tsx      # Password reset request
@@ -612,6 +612,21 @@ const MyComponent = () => {
   };
 };
 ```
+
+### Landing Page Features
+The Landing page (`src/pages/Landing.tsx`) includes:
+- **High-end welcome/onboarding screen**: Premium design with full-screen hero background image
+- **Full-screen hero background**: Uses `hero-background.jpg` as fixed background with overlay for readability
+- **Centered logo**: Displays `earth-space-logo-9.webp` near the top of the page
+- **Premium typography**: 
+  - Large serif headline "Welcome to Earth Space" in white (5xl to 7xl responsive sizing)
+  - Sans-serif body text in white describing features (class timetable, class booking, membership management)
+- **Pill-shaped action buttons**: Two horizontally aligned buttons at the bottom:
+  - Primary button: Solid white background with black text, labeled "LOG IN"
+  - Secondary button: White outline with white text, labeled "JOIN EARTH SPACE"
+- **Design principles**: Generous spacing, strong visual hierarchy, premium typography, clean layout, muted luxury color palette
+- **Responsive design**: Adapts to mobile, tablet, and desktop screen sizes
+- **Navigation**: Log in button navigates to `/login`, Join button navigates to `/register`
 
 ### Classes Page Features
 The Classes page (`src/pages/Classes.tsx`) includes:
