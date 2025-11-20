@@ -437,19 +437,25 @@ Defined in `src/index.css`:
 ## 🔧 Key Configuration Files
 
 ### `vite.config.ts`
-- **Base Path**: `/mars-space-gym-buddy/` (for GitHub Pages)
+- **Base Path**: 
+  - Development: `/` (for seamless local preview at `http://localhost:8080/`)
+  - Production: `/mars-space-gym-buddy/` (for GitHub Pages deployment)
+  - Automatically switches based on build mode (`mode === "production"`)
 - **Port**: 8080
 - **Alias**: `@` → `./src`
 - **Plugins**: React SWC, lovable-tagger (dev only)
-- **Note**: Base path handles asset paths (images, CSS, JS) automatically in production builds
+- **Note**: Base path handles asset paths (images, CSS, JS) automatically. Use `import.meta.env.BASE_URL` for static assets (images in `public/` folder) to ensure correct paths in both dev and production
 
 ### React Router Configuration
-- **Base Path**: `/mars-space-gym-buddy` (configured via `BrowserRouter basename` prop)
-- **Note**: All routes are relative to the base path on GitHub Pages
-- **Development**: Routes work normally at `http://localhost:8080/`
-- **Production**: Routes work at `https://pinnacleadvisors.github.io/mars-space-gym-buddy/`
+- **Base Path**: Conditionally set via `BrowserRouter basename` prop
+  - Development: `undefined` or `''` (routes work at `http://localhost:8080/`)
+  - Production: `/mars-space-gym-buddy` (routes work at `https://pinnacleadvisors.github.io/mars-space-gym-buddy/`)
+- **Base Path Detection**: `pathUtils.ts` provides `getBasePath()` which:
+  - Returns `/mars-space-gym-buddy` when hostname is `pinnacleadvisors.github.io`
+  - Returns `''` (empty string) for localhost/127.0.0.1 (development)
+  - Used in `App.tsx` to set `BrowserRouter basename` prop
 - **Navigation**: All `navigate()` calls use relative paths (e.g., `/login`, `/dashboard`) and automatically account for base path
-- **Base Path Detection**: `pathUtils.ts` provides `getBasePath()`, `getFullPath()`, and `getFullRedirectUrl()` utilities for conditional base path handling
+- **Utilities**: `pathUtils.ts` provides `getFullPath()` and `getFullRedirectUrl()` for external redirects (Supabase emailRedirectTo, OAuth, etc.)
 
 ### Layout & Navigation Configuration
 - **AppLayout**: Conditionally renders navigation (TopBar, BottomNav, Sidebar) only for authenticated users on protected routes
@@ -464,10 +470,57 @@ Defined in `src/index.css`:
 - **Allow JS**: true
 
 ### `package.json` Scripts
-- `dev` - Start development server
-- `build` - Build for production
-- `preview` - Preview production build
-- `deploy` - Deploy to GitHub Pages
+- `dev` - Start development server at `http://localhost:8080/` (base path: `/`)
+- `build` - Build for production with base path `/mars-space-gym-buddy/` (for GitHub Pages)
+- `preview` - Preview production build locally (uses production base path)
+- `deploy` - Deploy to GitHub Pages (builds and pushes `dist/` to `gh-pages` branch)
+- `gen:types` - Generate Supabase TypeScript types (updates `src/types/database.ts`)
+- `sync:types` - Sync database types from GitHub (pulls latest changes)
+- `watch:types` - Watch for database type updates and auto-pull (runs in background)
+
+### Local Development Setup
+1. **Install Dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Start Development Server**:
+   ```bash
+   npm run dev
+   ```
+   - Server runs at `http://localhost:8080/`
+   - Base path is automatically set to `/` (no `/mars-space-gym-buddy/` prefix)
+   - Hot module replacement (HMR) enabled for instant updates
+   - Source maps enabled for debugging
+   - Access routes at `http://localhost:8080/`, `http://localhost:8080/login`, etc.
+
+3. **Preview Production Build Locally**:
+   ```bash
+   npm run build
+   npm run preview
+   ```
+   - Builds with production base path `/mars-space-gym-buddy/`
+   - Preview server runs locally to test production build
+   - Useful for testing before deploying to GitHub Pages
+
+4. **Deploy to GitHub Pages**:
+   ```bash
+   npm run deploy
+   ```
+   - Builds with production base path
+   - Deploys to `https://pinnacleadvisors.github.io/mars-space-gym-buddy/`
+
+**Important Notes**: 
+- In development, access routes at `http://localhost:8080/` (no base path prefix)
+- Static assets (images in `public/` folder) should use `import.meta.env.BASE_URL` which automatically adjusts for dev vs production
+- The `pathUtils.ts` utilities handle base path detection automatically based on hostname
+- The `vite.config.ts` uses conditional base path: `/` in dev, `/mars-space-gym-buddy/` in production
+
+### `package.json` Scripts
+- `dev` - Start development server at `http://localhost:8080/` (base path: `/`)
+- `build` - Build for production with base path `/mars-space-gym-buddy/` (for GitHub Pages)
+- `preview` - Preview production build locally (uses production base path)
+- `deploy` - Deploy to GitHub Pages (builds and pushes `dist/` to `gh-pages` branch)
 - `gen:types` - Generate Supabase TypeScript types (updates `src/types/database.ts`)
 - `sync:types` - Sync database types from GitHub (pulls latest changes)
 - `watch:types` - Watch for database type updates and auto-pull (runs in background)

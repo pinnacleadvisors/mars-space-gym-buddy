@@ -10,8 +10,9 @@ export default defineConfig(({ mode }) => ({
     port: 8080,
   },
 
-  // ⭐ ADD THIS LINE for GitHub Pages
-  base: "/mars-space-gym-buddy/",
+  // Use base path only in production builds for GitHub Pages
+  // In development, use "/" for seamless local preview
+  base: mode === "production" ? "/mars-space-gym-buddy/" : "/",
 
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
 
@@ -21,3 +22,4 @@ export default defineConfig(({ mode }) => ({
     },
   },
 }));
+
