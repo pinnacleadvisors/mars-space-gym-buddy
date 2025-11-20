@@ -46,9 +46,22 @@ export const useBookings = (userId?: string) => {
         return;
       }
 
+      // Query bookings and join with class_sessions
+      // class_bookings.class_id references class_sessions.id
+      // Note: Supabase requires explicit foreign key relationship syntax
       const { data, error: fetchError } = await supabase
         .from('class_bookings')
-        .select('*, class_sessions(id, name, instructor, start_time, end_time, capacity)')
+        .select(`
+          *,
+          class_sessions(
+            id,
+            name,
+            instructor,
+            start_time,
+            end_time,
+            capacity
+          )
+        `)
         .eq('user_id', currentUserId)
         .order('created_at', { ascending: false });
 

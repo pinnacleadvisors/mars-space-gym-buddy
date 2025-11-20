@@ -26,6 +26,8 @@ import { toastMessages, showErrorToast } from "@/lib/utils/toastHelpers";
 import { useBookings, BookingWithDetails } from "@/hooks/useBookings";
 import { format, parseISO, isAfter, isBefore, startOfToday, isSameDay } from "date-fns";
 import { Calendar } from "@/components/ui/calendar";
+import { Skeleton } from "@/components/ui/skeleton";
+import { BookingCardSkeletons } from "@/components/loading/BookingCardSkeleton";
 
 const Bookings = () => {
   const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
