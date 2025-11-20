@@ -525,10 +525,18 @@ Defined in `src/index.css`:
    - **Fallback Mechanism**: If trigger fails or doesn't fire, `Register.tsx` includes `ensureProfileAndRole()` function that:
      - Checks if profile exists, creates it if missing
      - Checks if 'member' role exists, creates it if missing
-     - Runs after signup and after OTP verification to ensure data exists
+     - Runs after signup to ensure data exists
    - **RLS Policies**: Users can insert their own profile and 'member' role as fallback (policies added in migration `20250120000000_ensure_profile_role_on_signup.sql`)
-   - Email verification code sent → User must verify email via OTP before accessing protected routes
-2. Email verification code sent → User must verify email before accessing protected routes
+   - **Email Verification**: 
+     - Verification email sent with a link (via `emailRedirectTo` option)
+     - Users verify email by clicking the link in the email
+     - User is redirected directly to dashboard after signup (no OTP code required)
+     - **Future Implementation**: OTP code verification can be added in the future if needed (see `Register.tsx` for TODO comment)
+2. **Email Verification Flow**:
+   - User receives verification email with link
+   - Clicking link verifies email and redirects to dashboard
+   - If email not verified, `ProtectedRoute` shows `EmailVerificationRequired` page
+   - User can resend verification email from `EmailVerificationRequired` page
 3. Admin login checks `has_role()` RPC function
 4. `useAdminAuth` hook manages admin state and redirects
 5. `useAuth` hook manages user authentication and session
@@ -539,7 +547,7 @@ Defined in `src/index.css`:
 6. `useSessionManager` hook monitors session expiration and shows warnings
 7. Session automatically refreshes on app load if expired
 8. Session warnings shown at 15 minutes and 5 minutes before expiration
-9. Email verification enforced via `ProtectedRoute` component
+9. Email verification enforced via `ProtectedRoute` component (users verify via link in email, not OTP code)
 10. Account lockout after 5 failed login attempts (15 minute lockout duration)
 11. **Login Flow**: After successful login, waits 1 second before navigation to ensure auth state listener has processed and set user in useAuth hook
 
@@ -1158,7 +1166,8 @@ The application implements comprehensive authentication security:
 - `ProtectedRoute` component checks `user.email_verified` status
 - Shows `EmailVerificationRequired` page if email not verified
 - Resend verification email functionality
-- OTP verification during registration
+- Email verification via link in email (click link to verify)
+- **Future Implementation**: OTP code verification can be added if needed (currently not implemented)
 - Email verification status tracked in `useAuth` hook
 
 **Account Lockout Protection:**

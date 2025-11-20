@@ -5,9 +5,8 @@ import { useNavigate } from "react-router-dom";
 import { Dumbbell } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { toastMessages, showErrorToast, showInfoToast } from "@/lib/utils/toastHelpers";
+import { toastMessages, showErrorToast } from "@/lib/utils/toastHelpers";
 import { Separator } from "@/components/ui/separator";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,8 +27,6 @@ const Register = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [showOTP, setShowOTP] = useState(false);
-  const [email, setEmail] = useState("");
 
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -66,14 +63,20 @@ const Register = () => {
       if (signUpData?.user) {
         // Ensure profile and role are created (fallback if trigger fails)
         await ensureProfileAndRole(signUpData.user.id, sanitizedFullName);
+        
+        // Wait a bit for auth state to update
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      setEmail(sanitizedEmail);
-      setShowOTP(true);
-      showInfoToast({
-        title: "Verification code sent",
-        description: "Please check your email for the verification code.",
-      });
+      // Show success message and navigate to dashboard
+      toast(toastMessages.registrationSuccess());
+      
+      // TODO: Future implementation - Email verification code/OTP
+      // Currently, users are redirected directly to dashboard after signup.
+      // The verification email contains a link that users can click to verify their email.
+      // OTP code verification can be added in the future if needed.
+      
+      navigate("/dashboard");
     } catch (error: any) {
       showErrorToast({
         title: "Registration failed",
@@ -135,39 +138,12 @@ const Register = () => {
     }
   };
 
-  const handleOTPVerify = async (otp: string) => {
-    if (otp.length !== 6) return;
-    
-    setIsLoading(true);
-    try {
-      const { data: verifyData, error } = await supabase.auth.verifyOtp({
-        email,
-        token: otp,
-        type: 'signup',
-      });
-
-      if (error) throw error;
-
-      if (verifyData?.user) {
-        // Ensure profile and role are created after verification (fallback if trigger failed)
-        const fullName = verifyData.user.user_metadata?.full_name || '';
-        await ensureProfileAndRole(verifyData.user.id, fullName);
-        
-        // Wait a bit for auth state to update
-        await new Promise(resolve => setTimeout(resolve, 500));
-      }
-
-      toast(toastMessages.registrationSuccess());
-      navigate("/dashboard");
-    } catch (error: any) {
-      showErrorToast({
-        title: "Verification failed",
-        description: error.message,
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // TODO: Future implementation - OTP verification code
+  // This function can be implemented in the future if OTP code verification is needed
+  // For now, users verify their email by clicking the link in the verification email
+  // const handleOTPVerify = async (otp: string) => {
+  //   // Implementation for OTP verification
+  // };
 
   const handleOAuthSignup = async (provider: 'google' | 'apple') => {
     const { error } = await supabase.auth.signInWithOAuth({
@@ -198,122 +174,91 @@ const Register = () => {
           <CardDescription>Join our fitness community today</CardDescription>
         </CardHeader>
         <CardContent>
-          {!showOTP ? (
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-                <FormField
-                  control={form.control}
-                  name="fullName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Full Name</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="John Doe"
-                          disabled={isLoading}
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Email</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="email"
-                          placeholder="your@email.com"
-                          disabled={isLoading}
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Password</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="••••••••"
-                          disabled={isLoading}
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormDescription className="text-xs">
-                        Must be at least 8 characters with uppercase, lowercase, and a number
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="confirmPassword"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Confirm Password</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder="••••••••"
-                          disabled={isLoading}
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button 
-                  type="submit" 
-                  className="w-full bg-accent hover:bg-accent/90" 
-                  disabled={isLoading || Object.keys(form.formState.errors).length > 0}
-                >
-                  {isLoading ? "Creating Account..." : "Create Account"}
-                </Button>
-              </form>
-            </Form>
-          ) : (
-            <div className="space-y-4">
-              <div className="text-center space-y-2">
-                <h3 className="font-semibold">Verify Your Email</h3>
-                <p className="text-sm text-muted-foreground">
-                  Enter the 6-digit code sent to {email}
-                </p>
-              </div>
-              <div className="flex justify-center">
-                <InputOTP maxLength={6} onChange={handleOTPVerify} disabled={isLoading}>
-                  <InputOTPGroup>
-                    <InputOTPSlot index={0} />
-                    <InputOTPSlot index={1} />
-                    <InputOTPSlot index={2} />
-                    <InputOTPSlot index={3} />
-                    <InputOTPSlot index={4} />
-                    <InputOTPSlot index={5} />
-                  </InputOTPGroup>
-                </InputOTP>
-              </div>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="fullName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Name</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="John Doe"
+                        disabled={isLoading}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="email"
+                        placeholder="your@email.com"
+                        disabled={isLoading}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        disabled={isLoading}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription className="text-xs">
+                      Must be at least 8 characters with uppercase, lowercase, and a number
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm Password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="••••••••"
+                        disabled={isLoading}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <Button 
-                variant="ghost" 
-                className="w-full" 
-                onClick={() => setShowOTP(false)}
-                disabled={isLoading}
+                type="submit" 
+                className="w-full bg-accent hover:bg-accent/90" 
+                disabled={isLoading || Object.keys(form.formState.errors).length > 0}
               >
-                Back to registration
+                {isLoading ? "Creating Account..." : "Create Account"}
               </Button>
-            </div>
-          )}
+            </form>
+          </Form>
 
           <div className="relative my-6">
             <Separator />
