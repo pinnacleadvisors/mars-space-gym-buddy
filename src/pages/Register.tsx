@@ -50,7 +50,7 @@ const Register = () => {
       const sanitizedEmail = sanitizeEmail(data.email);
       const sanitizedFullName = sanitizeString(data.fullName);
 
-      const { error } = await supabase.auth.signUp({
+      const { data: signUpData, error } = await supabase.auth.signUp({
         email: sanitizedEmail,
         password: data.password,
         options: {
@@ -62,6 +62,11 @@ const Register = () => {
       });
 
       if (error) throw error;
+
+      if (signUpData?.user) {
+        // Ensure profile and role are created (fallback if trigger fails)
+        await ensureProfileAndRole(signUpData.user.id, sanitizedFullName);
+      }
 
       setEmail(sanitizedEmail);
       setShowOTP(true);
@@ -79,18 +84,78 @@ const Register = () => {
     }
   };
 
+  // Helper function to ensure profile and role exist (fallback if trigger fails)
+  const ensureProfileAndRole = async (userId: string, fullName: string) => {
+    try {
+      // Check if profile exists
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .single();
+
+      // Create profile if it doesn't exist
+      if (!existingProfile) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            full_name: fullName,
+          });
+
+        if (profileError && profileError.code !== '23505') { // Ignore duplicate key errors
+          console.error('Error creating profile:', profileError);
+        }
+      }
+
+      // Check if role exists
+      const { data: existingRole } = await supabase
+        .from('user_roles')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('role', 'member')
+        .single();
+
+      // Create role if it doesn't exist
+      if (!existingRole) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({
+            user_id: userId,
+            role: 'member',
+          });
+
+        if (roleError && roleError.code !== '23505') { // Ignore duplicate key errors
+          console.error('Error creating role:', roleError);
+        }
+      }
+    } catch (error) {
+      console.error('Error ensuring profile and role:', error);
+      // Don't throw - this is a fallback mechanism
+    }
+  };
+
   const handleOTPVerify = async (otp: string) => {
     if (otp.length !== 6) return;
     
     setIsLoading(true);
     try {
-      const { error } = await supabase.auth.verifyOtp({
+      const { data: verifyData, error } = await supabase.auth.verifyOtp({
         email,
         token: otp,
         type: 'signup',
       });
 
       if (error) throw error;
+
+      if (verifyData?.user) {
+        // Ensure profile and role are created after verification (fallback if trigger failed)
+        const fullName = verifyData.user.user_metadata?.full_name || '';
+        await ensureProfileAndRole(verifyData.user.id, fullName);
+        
+        // Wait a bit for auth state to update
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
 
       toast(toastMessages.registrationSuccess());
       navigate("/dashboard");

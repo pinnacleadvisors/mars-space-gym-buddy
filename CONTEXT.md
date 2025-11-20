@@ -173,8 +173,11 @@ mars-space-gym-buddy/
   - `created_at` (timestamptz)
 - **RLS**: 
   - Users can view own roles (`auth.uid() = user_id`)
+  - Users can insert their own 'member' role (`auth.uid() = user_id AND role = 'member'`) - fallback if trigger fails
   - Admins can view all roles (`has_role(auth.uid(), 'admin')`)
   - Admins can insert/update/delete all roles
+- **Trigger**: Auto-creates 'member' role on user signup via `handle_new_user()` trigger
+- **Fallback**: Client-side creation in `Register.tsx` if trigger fails
 
 #### `profiles`
 - **Purpose**: Extended user profile data
@@ -190,8 +193,12 @@ mars-space-gym-buddy/
   - `health_notes` (text)
   - `created_at` (timestamptz)
   - `updated_at` (timestamptz)
-- **RLS**: Users can view/update own profile, admins can view/update all
-- **Trigger**: Auto-creates profile on user signup
+- **RLS**: 
+  - Users can view/update own profile (`auth.uid() = id`)
+  - Users can insert their own profile (`auth.uid() = id`) - fallback if trigger fails
+  - Admins can view/update/insert/delete all profiles
+- **Trigger**: Auto-creates profile on user signup via `handle_new_user()` trigger
+- **Fallback**: Client-side creation in `Register.tsx` if trigger fails
 
 #### `classes`
 - **Purpose**: Gym class definitions
@@ -300,6 +307,10 @@ mars-space-gym-buddy/
 #### `handle_new_user()`
 - **Purpose**: Auto-create profile and assign 'member' role on signup
 - **Trigger**: After INSERT on auth.users
+- **Security**: SECURITY DEFINER function (bypasses RLS)
+- **Error Handling**: Uses `ON CONFLICT DO NOTHING` to prevent failures if profile/role already exists
+- **Graceful Failure**: Catches all exceptions and logs warnings without failing the auth.users insert
+- **Fallback**: Client-side `ensureProfileAndRole()` function in `Register.tsx` creates profile/role if trigger fails
 
 ### Database Enums
 
@@ -505,20 +516,32 @@ Defined in `src/index.css`:
 - **DO NOT USE**: `src/integrations/supabase/types.ts` - Empty file
 
 ### Authentication Flow
-1. User signs up → `handle_new_user()` trigger creates profile and assigns 'member' role
+1. **User Signup**:
+   - User submits registration form with email, password, and full name
+   - `supabase.auth.signUp()` creates auth user and triggers `handle_new_user()` database function
+   - `handle_new_user()` trigger (SECURITY DEFINER) automatically:
+     - Creates row in `profiles` table with user ID and full name
+     - Creates row in `user_roles` table with user ID and 'member' role
+   - **Fallback Mechanism**: If trigger fails or doesn't fire, `Register.tsx` includes `ensureProfileAndRole()` function that:
+     - Checks if profile exists, creates it if missing
+     - Checks if 'member' role exists, creates it if missing
+     - Runs after signup and after OTP verification to ensure data exists
+   - **RLS Policies**: Users can insert their own profile and 'member' role as fallback (policies added in migration `20250120000000_ensure_profile_role_on_signup.sql`)
+   - Email verification code sent → User must verify email via OTP before accessing protected routes
 2. Email verification code sent → User must verify email before accessing protected routes
 3. Admin login checks `has_role()` RPC function
 4. `useAdminAuth` hook manages admin state and redirects
 5. `useAuth` hook manages user authentication and session
    - **Fallback User Creation**: If profile/role queries fail, creates minimal user from auth user data to prevent redirect loops
    - **Auth State Listener**: Automatically updates user data on SIGNED_IN, TOKEN_REFRESHED, and USER_UPDATED events
+   - **Immediate Fallback User**: On SIGNED_IN event, immediately sets fallback user from session data before fetching full profile data
    - **Error Handling**: Always creates user object even if database queries fail, ensuring login completes successfully
 6. `useSessionManager` hook monitors session expiration and shows warnings
 7. Session automatically refreshes on app load if expired
 8. Session warnings shown at 15 minutes and 5 minutes before expiration
 9. Email verification enforced via `ProtectedRoute` component
 10. Account lockout after 5 failed login attempts (15 minute lockout duration)
-11. **Login Flow**: After successful login, brief delay (100ms) before navigation to allow auth state to propagate
+11. **Login Flow**: After successful login, waits 1 second before navigation to ensure auth state listener has processed and set user in useAuth hook
 
 ### Membership Flow
 1. User clicks "Register Membership" → `create-checkout` function

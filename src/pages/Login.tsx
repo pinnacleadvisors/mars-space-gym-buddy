@@ -160,22 +160,9 @@ const Login = () => {
       toast(toastMessages.loginSuccess());
       
       // Wait for auth state to propagate (onAuthStateChange listener will update useAuth hook)
-      // Poll for user to be set (max 3 seconds)
-      let attempts = 0;
-      const maxAttempts = 30; // 30 * 100ms = 3 seconds max wait
-      while (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        const { data: { session: currentSession } } = await supabase.auth.getSession();
-        if (currentSession?.user) {
-          console.log('Session confirmed, user:', currentSession.user.id);
-          break;
-        }
-        attempts++;
-      }
-      
-      if (attempts >= maxAttempts) {
-        console.warn('Timeout waiting for auth state, proceeding with navigation');
-      }
+      // Wait longer to ensure the auth state listener has processed and set the user
+      // The listener sets a fallback user immediately, so this should be quick
+      await new Promise(resolve => setTimeout(resolve, 1000));
       
       console.log('Navigating to dashboard...');
       navigate("/dashboard");
