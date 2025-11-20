@@ -197,16 +197,19 @@ export const useAuth = () => {
         }
 
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+          console.log('Auth state change:', event, session?.user?.id);
           setLoading(true);
           try {
             const userData = await fetchUserData(session.user);
             // Always set user data, even if fetchUserData returns null (creates user from auth user)
             // This prevents infinite loops when queries fail
             if (userData) {
+              console.log('User data fetched successfully:', userData.id);
               setUser(userData);
             } else if (session.user) {
               // If fetchUserData returns null, create a minimal user from auth user
               // This allows login to complete even if profile/role queries fail
+              console.log('Creating fallback user from auth data');
               const fallbackUser: User = {
                 id: session.user.id,
                 email: session.user.email || '',
@@ -226,6 +229,7 @@ export const useAuth = () => {
             console.error('Error updating user data:', error);
             // Even on error, create a fallback user to prevent redirect loops
             if (session.user) {
+              console.log('Creating fallback user after error');
               const fallbackUser: User = {
                 id: session.user.id,
                 email: session.user.email || '',
@@ -245,6 +249,7 @@ export const useAuth = () => {
             }
           } finally {
             setLoading(false);
+            console.log('Auth state update complete, loading set to false');
           }
         }
       }

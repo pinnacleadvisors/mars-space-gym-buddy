@@ -23,6 +23,7 @@ export const ProtectedRoute = ({
   const location = useLocation();
 
   // Show loading state while checking authentication
+  // Give auth state time to update after login (max 2 seconds)
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -37,6 +38,7 @@ export const ProtectedRoute = ({
   // Redirect to login if not authenticated
   // Save the attempted location to redirect back after login
   if (!user) {
+    console.log('ProtectedRoute: No user found, redirecting to login');
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

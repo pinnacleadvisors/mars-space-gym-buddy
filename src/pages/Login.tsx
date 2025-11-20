@@ -86,12 +86,13 @@ const Login = () => {
         return;
       }
 
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: authData, error } = await supabase.auth.signInWithPassword({
         email: sanitizedEmail,
         password: data.password,
       });
 
       if (error) {
+        console.error('Login error:', error);
         // Record failed attempt
         const lockoutResult = recordFailedAttempt(sanitizedEmail);
         const attempts = getRemainingAttempts(sanitizedEmail);
@@ -133,19 +134,51 @@ const Login = () => {
       setLockoutInfo(null);
       setRemainingAttempts(null);
 
+      if (!authData?.user) {
+        console.error('No user data returned from login');
+        throw new Error("Login failed: No user data returned");
+      }
+
+      // Wait for session to be available and verify it
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error('Error getting session after login:', sessionError);
+        throw sessionError;
+      }
+      if (!session) {
+        console.error('No session available after login');
+        throw new Error("Failed to get session after login");
+      }
+
+      console.log('Login successful, session:', session?.user?.id);
+
       // Check if email is verified
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user && !user.email_confirmed_at) {
+      if (session.user && !session.user.email_confirmed_at) {
         toast(toastMessages.emailVerificationRequired());
       }
 
       toast(toastMessages.loginSuccess());
       
-      // Small delay to allow auth state to propagate before navigation
-      // This prevents race conditions with useAuth hook's onAuthStateChange listener
-      setTimeout(() => {
-        navigate("/dashboard");
-      }, 100);
+      // Wait for auth state to propagate (onAuthStateChange listener will update useAuth hook)
+      // Poll for user to be set (max 3 seconds)
+      let attempts = 0;
+      const maxAttempts = 30; // 30 * 100ms = 3 seconds max wait
+      while (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (currentSession?.user) {
+          console.log('Session confirmed, user:', currentSession.user.id);
+          break;
+        }
+        attempts++;
+      }
+      
+      if (attempts >= maxAttempts) {
+        console.warn('Timeout waiting for auth state, proceeding with navigation');
+      }
+      
+      console.log('Navigating to dashboard...');
+      navigate("/dashboard");
     } catch (error: any) {
       // Error already handled above
     } finally {
