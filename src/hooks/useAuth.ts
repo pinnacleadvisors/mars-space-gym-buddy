@@ -199,54 +199,51 @@ export const useAuth = () => {
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
           console.log('Auth state change:', event, session?.user?.id);
           setLoading(true);
+          
+          // Create fallback user immediately so ProtectedRoute doesn't redirect
+          // This ensures login works even if fetchUserData hangs or fails
+          if (session?.user) {
+            const fallbackUser: User = {
+              id: session.user.id,
+              email: session.user.email || '',
+              full_name: session.user.user_metadata?.full_name || '',
+              phone: undefined,
+              role: 'member',
+              membership_status: 'inactive',
+              membership_start_date: undefined,
+              membership_end_date: undefined,
+              created_at: session.user.created_at || new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              email_verified: session.user.email_confirmed_at !== null && session.user.email_confirmed_at !== undefined,
+            };
+            console.log('Setting fallback user immediately:', fallbackUser.id);
+            setUser(fallbackUser);
+          }
+          
+          // Try to fetch full user data in the background (with timeout)
           try {
-            const userData = await fetchUserData(session.user);
-            // Always set user data, even if fetchUserData returns null (creates user from auth user)
-            // This prevents infinite loops when queries fail
+            const fetchWithTimeout = Promise.race([
+              fetchUserData(session.user),
+              new Promise<null>((resolve) => 
+                setTimeout(() => {
+                  console.warn('fetchUserData timeout after 3 seconds, using fallback user');
+                  resolve(null);
+                }, 3000)
+              ),
+            ]);
+            
+            const userData = await fetchWithTimeout;
+            
+            // Update with full user data if available
             if (userData) {
-              console.log('User data fetched successfully:', userData.id);
+              console.log('User data fetched successfully, updating:', userData.id);
               setUser(userData);
-            } else if (session.user) {
-              // If fetchUserData returns null, create a minimal user from auth user
-              // This allows login to complete even if profile/role queries fail
-              console.log('Creating fallback user from auth data');
-              const fallbackUser: User = {
-                id: session.user.id,
-                email: session.user.email || '',
-                full_name: session.user.user_metadata?.full_name || '',
-                phone: undefined,
-                role: 'member',
-                membership_status: 'inactive',
-                membership_start_date: undefined,
-                membership_end_date: undefined,
-                created_at: session.user.created_at || new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                email_verified: session.user.email_confirmed_at !== null && session.user.email_confirmed_at !== undefined,
-              };
-              setUser(fallbackUser);
+            } else {
+              console.log('Using fallback user (fetchUserData returned null or timed out)');
             }
           } catch (error) {
             console.error('Error updating user data:', error);
-            // Even on error, create a fallback user to prevent redirect loops
-            if (session.user) {
-              console.log('Creating fallback user after error');
-              const fallbackUser: User = {
-                id: session.user.id,
-                email: session.user.email || '',
-                full_name: session.user.user_metadata?.full_name || '',
-                phone: undefined,
-                role: 'member',
-                membership_status: 'inactive',
-                membership_start_date: undefined,
-                membership_end_date: undefined,
-                created_at: session.user.created_at || new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                email_verified: session.user.email_confirmed_at !== null && session.user.email_confirmed_at !== undefined,
-              };
-              setUser(fallbackUser);
-            } else {
-              setUser(null);
-            }
+            // Fallback user already set above, so we can continue
           } finally {
             setLoading(false);
             console.log('Auth state update complete, loading set to false');
