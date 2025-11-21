@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -39,6 +39,17 @@ const AdminAnalytics = () => {
   const { data, revenueData, memberGrowth, loading, error, refresh } = useAnalytics(
     dateRange ? { dateRange } : undefined
   );
+
+  // Initialize date range on mount
+  useEffect(() => {
+    if (!dateRange) {
+      const end = new Date();
+      const start = subDays(end, 30);
+      setStartDate(start);
+      setEndDate(end);
+      setDateRange({ startDate: start, endDate: end });
+    }
+  }, []); // Only run on mount
 
   // Handle date range preset changes
   const handlePresetChange = (preset: string) => {

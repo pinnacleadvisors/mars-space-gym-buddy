@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { AnalyticsData, ClassAnalytics, VisitTrend, MembershipBreakdown, RevenueData } from '@/types/analytics';
 
@@ -34,7 +34,18 @@ export const useAnalytics = (filters?: AnalyticsFilters) => {
     return { startDate, endDate };
   }, []);
 
-  const dateRange = filters?.dateRange || getDefaultDateRange();
+  // Memoize dateRange to prevent infinite loops
+  // Only recreate when the actual date values change, not on every render
+  const dateRange = useMemo(() => {
+    if (filters?.dateRange) {
+      return filters.dateRange;
+    }
+    return getDefaultDateRange();
+  }, [
+    filters?.dateRange?.startDate?.getTime() ?? null,
+    filters?.dateRange?.endDate?.getTime() ?? null,
+    getDefaultDateRange
+  ]);
 
   /**
    * Fetch member growth statistics
