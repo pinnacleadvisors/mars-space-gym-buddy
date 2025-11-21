@@ -342,8 +342,8 @@ const Dashboard = () => {
                   const hoursUntil = differenceInHours(startTime, now);
                   const minutesUntil = differenceInMinutes(startTime, now);
                   const isSoon = hoursUntil < 24;
-                  const isToday = isToday(startTime);
-                  const isThisWeek = isThisWeek(startTime);
+                  const isTodayDate = isToday(startTime);
+                  const isThisWeekDate = isThisWeek(startTime);
 
                   return (
                     <div
@@ -357,8 +357,8 @@ const Dashboard = () => {
                           <div className="flex items-center gap-2 mb-1">
                             <h3 className="font-medium">{booking.class_sessions?.name}</h3>
                             {isSoon && (
-                              <Badge variant={isToday ? "destructive" : "default"} className="text-xs">
-                                {isToday ? "Today" : isThisWeek ? "This Week" : "Soon"}
+                              <Badge variant={isTodayDate ? "destructive" : "default"} className="text-xs">
+                                {isTodayDate ? "Today" : isThisWeekDate ? "This Week" : "Soon"}
                               </Badge>
                             )}
                           </div>
