@@ -25,6 +25,7 @@ import AdminManageMemberships from "./pages/AdminManageMemberships";
 import AdminUserMemberships from "./pages/AdminUserMemberships";
 import ManageMemberships from "./pages/ManageMemberships";
 import Profile from "./pages/Profile";
+import EmailVerificationRequired from "./pages/EmailVerificationRequired";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -47,6 +48,16 @@ const App = () => {
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            
+            {/* Email Verification Route - Requires Auth but not email verification */}
+            <Route
+              path="/verify-email"
+              element={
+                <ProtectedRoute requireEmailVerification={false}>
+                  <EmailVerificationRequired />
+                </ProtectedRoute>
+              }
+            />
             
             {/* Protected Routes - Require Authentication */}
             <Route

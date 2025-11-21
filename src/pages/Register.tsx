@@ -68,15 +68,15 @@ const Register = () => {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      // Show success message and navigate to dashboard
-      toast(toastMessages.registrationSuccess());
+      // Show success message and navigate to email verification page
+      toast({
+        title: "Account created successfully",
+        description: "Please check your email to verify your account before accessing the dashboard.",
+      });
       
-      // TODO: Future implementation - Email verification code/OTP
-      // Currently, users are redirected directly to dashboard after signup.
-      // The verification email contains a link that users can click to verify their email.
-      // OTP code verification can be added in the future if needed.
-      
-      navigate("/dashboard");
+      // Navigate to email verification page instead of dashboard
+      // User must verify email by clicking the link in the verification email
+      navigate("/verify-email");
     } catch (error: any) {
       showErrorToast({
         title: "Registration failed",

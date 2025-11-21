@@ -410,6 +410,12 @@ Used in `.github/workflows/github-actions-demo.yml`:
 - `/forgot-password` - Password reset request
 - `/reset-password` - Password reset form
 
+### Email Verification Route
+- `/verify-email` - Email verification required page (requires authentication but not email verification)
+  - Shown automatically after user signup
+  - User must click verification link in email before accessing protected routes
+  - Provides resend verification email functionality
+
 ### Authenticated User Routes (Protected by `ProtectedRoute`)
 - `/dashboard` - User dashboard
 - `/classes` - Browse classes
@@ -421,6 +427,7 @@ Used in `.github/workflows/github-actions-demo.yml`:
 **Note**: All authenticated routes are wrapped with `ProtectedRoute` component which:
 - Checks if user is authenticated
 - Redirects to `/login` if not authenticated
+- Shows `EmailVerificationRequired` page if email is not verified (when `requireEmailVerification` is true, default)
 - Preserves attempted location for redirect after login
 
 ### Admin Routes (Protected by `AdminRoute`)
@@ -605,14 +612,17 @@ Defined in `src/index.css`:
    - **RLS Policies**: Users can insert their own profile and 'member' role as fallback (defined in Supabase Dashboard)
    - **Email Verification**: 
      - Verification email sent with a link (via `emailRedirectTo` option)
-     - Users verify email by clicking the link in the email
-     - User is redirected directly to dashboard after signup (no OTP code required)
+     - After signup, user is redirected to `/verify-email` page (not dashboard)
+     - User must click the verification link in the email before accessing protected routes
      - **Future Implementation**: OTP code verification can be added in the future if needed (see `Register.tsx` for TODO comment)
 2. **Email Verification Flow**:
+   - After signup, user is automatically redirected to `/verify-email` page
    - User receives verification email with link
-   - Clicking link verifies email and redirects to dashboard
-   - If email not verified, `ProtectedRoute` shows `EmailVerificationRequired` page
+   - User must click the link in the email to verify their account
+   - Clicking the verification link verifies email and redirects to dashboard
+   - If user tries to access protected routes without verification, `ProtectedRoute` shows `EmailVerificationRequired` page
    - User can resend verification email from `EmailVerificationRequired` page
+   - **Route**: `/verify-email` - Dedicated route for email verification (requires authentication but not email verification)
 3. Admin login checks `has_role()` RPC function
 4. `useAdminAuth` hook manages admin state and redirects
 5. `useAuth` hook manages user authentication and session
