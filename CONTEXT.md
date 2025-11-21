@@ -106,6 +106,8 @@ mars-space-gym-buddy/
 │   │   ├── check-subscription/    # Subscription status check
 │   │   └── cancel-subscription/   # Subscription cancellation
 │   └── migrations/                # Database migrations (run in Supabase Dashboard SQL Editor)
+│       ├── RESET_DATABASE.sql     # Resets database (drops all tables, functions, types, and policies)
+│       └── COMPLETE_SCHEMA_SETUP.sql # Complete database schema setup from scratch
 ├── scripts/                       # Utility scripts
 │   ├── sync-database-types.sh    # Script to sync database types from GitHub
 │   └── watch-database-types.sh   # Watch script for auto-pulling type updates
@@ -162,11 +164,12 @@ mars-space-gym-buddy/
 
 **🔧 Schema Management**:
 - **Schema Definition**: Manually set up in Supabase Dashboard following the guide in `docs/DATABASE_SCHEMA_SETUP.md`
-- **Manual Setup Guide**: See `docs/DATABASE_SCHEMA_SETUP.md` for step-by-step instructions on creating tables, columns, RLS policies, functions, and triggers in Supabase Dashboard
 - **TypeScript Types**: Auto-generated to `src/types/database.ts` via GitHub Actions workflow
 - **Type Sync**: Run `npm run sync:types` or `npm run watch:types` to pull latest schema changes
-- **Migration Files**: Migration files in `supabase/migrations/` are available as reference, but manual setup via Dashboard is recommended (see `docs/DATABASE_SCHEMA_SETUP.md`)
-- **Reference**: Always check both `src/types/database.ts` (for current state) and `docs/DATABASE_SCHEMA_SETUP.md` (for setup instructions)
+- **Migration Files**: Two migration files available in `supabase/migrations/`:
+  - `RESET_DATABASE.sql`: Drops all tables, functions, types, and policies (use with caution)
+  - `COMPLETE_SCHEMA_SETUP.sql`: Complete database schema setup from scratch (run after RESET_DATABASE.sql or for fresh setup)
+- **Reference**: Always check `src/types/database.ts` for the current database schema state
 
 **📖 Reading the Schema**:
 - Check `src/types/database.ts` for the current table structure, relationships, and column types
@@ -255,7 +258,7 @@ mars-space-gym-buddy/
 - **RLS**: 
   - Users can view/insert/update/delete own bookings (`auth.uid() = user_id`)
   - Admins can view/update/delete all bookings (`has_role(auth.uid(), 'admin')`)
-- **Migration**: Foreign key relationship fixed in `supabase/migrations/20250121000000_initial_schema_setup.sql` to reference `class_sessions`
+- **Migration**: Foreign key relationship fixed in `supabase/migrations/COMPLETE_SCHEMA_SETUP.sql` to reference `class_sessions`
 
 #### `memberships`
 - **Purpose**: Membership plan definitions
@@ -306,7 +309,7 @@ mars-space-gym-buddy/
 - **Usage**: Used in RLS policies and application code
 - **RLS Bypass**: Function runs with postgres role privileges (which has BYPASSRLS), preventing infinite recursion when called from RLS policies on `user_roles` table
 - **Implementation**: Function uses `SECURITY DEFINER` to bypass RLS when querying `user_roles`, preventing infinite recursion
-- **Migration**: Defined in `supabase/migrations/20250121000000_initial_schema_setup.sql` with proper SECURITY DEFINER and BYPASSRLS to fix infinite recursion
+- **Migration**: Defined in `supabase/migrations/COMPLETE_SCHEMA_SETUP.sql` with proper SECURITY DEFINER and BYPASSRLS to fix infinite recursion
 
 #### `has_valid_membership(_user_id uuid) → boolean`
 - **Purpose**: Check if user has active paid membership
@@ -585,7 +588,7 @@ Defined in `src/index.css`:
   - This file is automatically synced from Supabase via GitHub Actions
   - Always refer to this file for the current database structure
   - Run `npm run sync:types` to pull the latest schema changes locally
-  - **Migration Files**: Schema is defined in `supabase/migrations/` files; run them in Supabase Dashboard SQL Editor to update the database
+  - **Migration Files**: Schema is defined in `supabase/migrations/COMPLETE_SCHEMA_SETUP.sql`; run it in Supabase Dashboard SQL Editor to set up the database
   - **TypeScript Types**: `database.ts` reflects the current state after migrations are run
 
 ### Authentication Flow
@@ -653,14 +656,14 @@ Defined in `src/index.css`:
 - **Issue**: Error "infinite recursion detected in policy for relation 'user_roles'"
 - **Cause**: `has_role()` function queries `user_roles` table, but RLS policies on `user_roles` call `has_role()`, creating infinite loop
 - **Solution**: `has_role()` function uses `SECURITY DEFINER` with postgres role (which has BYPASSRLS) to bypass RLS checks
-- **Migration**: Fixed in `supabase/migrations/20250121000000_initial_schema_setup.sql` - `has_role()` function is created with `SECURITY DEFINER` and `BYPASSRLS` to prevent infinite recursion
-- **Status**: Run the migration to fix this issue
+- **Migration**: Fixed in `supabase/migrations/COMPLETE_SCHEMA_SETUP.sql` - `has_role()` function is created with `SECURITY DEFINER` and `BYPASSRLS` to prevent infinite recursion
+- **Status**: Run `COMPLETE_SCHEMA_SETUP.sql` migration to fix this issue
 
 ### Foreign Key Relationship Errors in Supabase Queries
 - **Issue**: "Could not find a relationship between 'class_bookings' and 'class_sessions'"
 - **Cause**: `class_bookings.class_id` was referencing `classes` instead of `class_sessions` in the database
-- **Solution**: Migration `supabase/migrations/20250121000000_initial_schema_setup.sql` fixes the foreign key to reference `class_sessions`
-- **Migration**: The migration automatically detects and fixes the wrong foreign key relationship
+- **Solution**: Migration `supabase/migrations/COMPLETE_SCHEMA_SETUP.sql` fixes the foreign key to reference `class_sessions`
+- **Migration**: The migration creates the correct foreign key relationship when setting up the schema
 - **Note**: After running the migration, use `class_sessions(...)` syntax in select queries: `.select('*, class_sessions(id, name, instructor, ...)')`
 
 ### Import Path Issues
