@@ -51,7 +51,6 @@ mars-space-gym-buddy/
 │   │       ├── client.ts          # Supabase client configuration
 │   │       └── types.ts            # Auto-generated types (empty, use database.ts)
 │   ├── lib/
-│   │   ├── types.ts               # Auto-generated database types
 │   │   ├── utils.ts               # Utility functions
 │   │   └── utils/
 │   │       ├── dateUtils.ts       # Date utility functions
@@ -107,9 +106,6 @@ mars-space-gym-buddy/
 │   │   ├── check-subscription/    # Subscription status check
 │   │   └── cancel-subscription/   # Subscription cancellation
 │   └── migrations/                # Database migrations (run in Supabase Dashboard SQL Editor)
-├── docs/                          # Documentation
-│   ├── RLS_POLICY_AUDIT.md       # Comprehensive RLS policy audit
-│   └── RLS_TEST_CASES.md         # RLS policy test cases
 ├── scripts/                       # Utility scripts
 │   ├── sync-database-types.sh    # Script to sync database types from GitHub
 │   └── watch-database-types.sh   # Watch script for auto-pulling type updates
@@ -591,8 +587,6 @@ Defined in `src/index.css`:
   - Run `npm run sync:types` to pull the latest schema changes locally
   - **Migration Files**: Schema is defined in `supabase/migrations/` files; run them in Supabase Dashboard SQL Editor to update the database
   - **TypeScript Types**: `database.ts` reflects the current state after migrations are run
-- **Secondary**: `src/lib/types.ts` - Also contains database types (legacy?)
-- **DO NOT USE**: `src/integrations/supabase/types.ts` - Empty file
 
 ### Authentication Flow
 1. **User Signup**:
@@ -1238,8 +1232,8 @@ All tables have RLS enabled with comprehensive policies:
 - Both functions use `SET search_path = public` to prevent search path attacks
 
 **RLS Audit:**
-- Comprehensive audit completed (see `docs/RLS_POLICY_AUDIT.md`)
-- All edge cases tested (see `docs/RLS_TEST_CASES.md`)
+- Comprehensive audit completed
+- All edge cases tested
 - Missing policies added directly in Supabase Dashboard (see `src/types/database.ts` for current schema)
 - All admin functions verified as secure (SECURITY DEFINER with proper search_path)
 
