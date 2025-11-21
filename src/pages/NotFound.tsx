@@ -36,7 +36,7 @@ const NotFound = () => {
         </p>
         <div className="flex gap-4 justify-center">
           <Button onClick={() => navigate("/")} variant="default">
-            Return to Home
+          Return to Home
           </Button>
           <Button onClick={() => navigate(-1)} variant="outline">
             Go Back

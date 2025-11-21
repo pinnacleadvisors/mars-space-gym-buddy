@@ -24,8 +24,8 @@ const Landing = () => {
             alt="Earth Space" 
             className="h-16 md:h-20 lg:h-24 w-auto mx-auto"
           />
-        </div>
-        
+          </div>
+          
         {/* Main content - centered */}
         <div className="flex-1 flex flex-col items-center justify-center text-center max-w-3xl mx-auto space-y-8 md:space-y-12">
           {/* Large serif headline */}
@@ -38,24 +38,24 @@ const Landing = () => {
             Discover a premium fitness experience with our comprehensive class timetable, seamless class booking system, and intuitive membership management. Your wellness journey starts here.
           </p>
         </div>
-        
+          
         {/* Bottom buttons - horizontally aligned pill-shaped */}
         <div className="flex-shrink-0 w-full max-w-md mx-auto space-x-4 mb-8 md:mb-12 px-4">
-          <Button
+            <Button 
             onClick={() => navigate("/login")}
             className="flex-1 h-12 md:h-14 rounded-full bg-white text-black font-semibold text-base md:text-lg hover:bg-white/90 transition-all shadow-lg hover:shadow-xl"
-          >
+            >
             LOG IN
-          </Button>
-          <Button
+            </Button>
+            <Button 
             onClick={() => navigate("/register")}
-            variant="outline"
+              variant="outline" 
             className="flex-1 h-12 md:h-14 rounded-full border-2 border-white text-white font-semibold text-base md:text-lg hover:bg-white/10 transition-all backdrop-blur-sm"
-          >
+            >
             JOIN EARTH SPACE
-          </Button>
+            </Button>
+          </div>
         </div>
-      </div>
     </div>
   );
 };

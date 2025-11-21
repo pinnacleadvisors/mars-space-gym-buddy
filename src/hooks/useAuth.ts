@@ -125,7 +125,7 @@ export const useAuth = () => {
             if (refreshedSession.user && mounted) {
               const userData = await fetchUserData(refreshedSession.user);
               if (userData) {
-                setUser(userData);
+              setUser(userData);
               } else {
                 // Fallback to auth user data if fetchUserData fails
                 const fallbackUser: User = {
@@ -148,7 +148,7 @@ export const useAuth = () => {
             // Session is valid, fetch user data
             const userData = await fetchUserData(session.user);
             if (userData) {
-              setUser(userData);
+            setUser(userData);
             } else {
               // Fallback to auth user data if fetchUserData fails
               const fallbackUser: User = {
@@ -237,7 +237,7 @@ export const useAuth = () => {
             // Update with full user data if available
             if (userData) {
               console.log('User data fetched successfully, updating:', userData.id);
-              setUser(userData);
+            setUser(userData);
             } else {
               console.log('Using fallback user (fetchUserData returned null or timed out)');
             }

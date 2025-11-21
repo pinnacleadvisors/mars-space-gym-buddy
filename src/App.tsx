@@ -33,14 +33,14 @@ const App = () => {
   const basePath = getBasePath() || undefined;
   
   return (
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
           <BrowserRouter basename={basePath}>
-            <AppLayout>
-              <Routes>
+          <AppLayout>
+            <Routes>
             {/* Public Routes */}
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
@@ -150,13 +150,13 @@ const App = () => {
             
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
-              </Routes>
-            </AppLayout>
-          </BrowserRouter>
-        </TooltipProvider>
-      </QueryClientProvider>
-    </ErrorBoundary>
-  );
+          </Routes>
+        </AppLayout>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+  </ErrorBoundary>
+);
 };
 
 export default App;
