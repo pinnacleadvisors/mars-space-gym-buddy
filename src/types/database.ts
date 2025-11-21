@@ -22,16 +22,16 @@ export type Database = {
           duration_minutes: number | null
           id: string
           location: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
-          check_in_time: string
+          check_in_time?: string
           check_out_time?: string | null
           created_at?: string | null
           duration_minutes?: number | null
           id?: string
           location?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           check_in_time?: string
@@ -40,38 +40,53 @@ export type Database = {
           duration_minutes?: number | null
           id?: string
           location?: string | null
-          user_id?: string | null
+          user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "check_ins_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       class_bookings: {
         Row: {
-          class_id: string | null
+          class_id: string
           created_at: string | null
           id: string
           status: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
-          class_id?: string | null
+          class_id: string
           created_at?: string | null
           id?: string
           status?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
-          class_id?: string | null
+          class_id?: string
           created_at?: string | null
           id?: string
           status?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "class_bookings_class_id_fkey"
             columns: ["class_id"]
             isOneToOne: false
-            referencedRelation: "classes"
+            referencedRelation: "class_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "class_bookings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -79,6 +94,7 @@ export type Database = {
       class_sessions: {
         Row: {
           capacity: number | null
+          class_id: string | null
           created_at: string | null
           end_time: string
           id: string
@@ -88,6 +104,7 @@ export type Database = {
         }
         Insert: {
           capacity?: number | null
+          class_id?: string | null
           created_at?: string | null
           end_time: string
           id?: string
@@ -97,6 +114,7 @@ export type Database = {
         }
         Update: {
           capacity?: number | null
+          class_id?: string | null
           created_at?: string | null
           end_time?: string
           id?: string
@@ -104,49 +122,57 @@ export type Database = {
           name?: string
           start_time?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "class_sessions_class_id_fkey"
+            columns: ["class_id"]
+            isOneToOne: false
+            referencedRelation: "classes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       classes: {
         Row: {
-          capacity: number | null
+          capacity: number
           category: string | null
           created_at: string | null
           description: string | null
-          duration: number | null
+          duration: number
           id: string
           image_url: string | null
-          instructor: string | null
+          instructor: string
           is_active: boolean | null
           name: string
-          schedule: string | null
+          schedule: string
           updated_at: string | null
         }
         Insert: {
-          capacity?: number | null
+          capacity?: number
           category?: string | null
           created_at?: string | null
           description?: string | null
-          duration?: number | null
+          duration: number
           id?: string
           image_url?: string | null
-          instructor?: string | null
+          instructor: string
           is_active?: boolean | null
           name: string
-          schedule?: string | null
+          schedule: string
           updated_at?: string | null
         }
         Update: {
-          capacity?: number | null
+          capacity?: number
           category?: string | null
           created_at?: string | null
           description?: string | null
-          duration?: number | null
+          duration?: number
           id?: string
           image_url?: string | null
-          instructor?: string | null
+          instructor?: string
           is_active?: boolean | null
           name?: string
-          schedule?: string | null
+          schedule?: string
           updated_at?: string | null
         }
         Relationships: []
@@ -182,7 +208,7 @@ export type Database = {
         Row: {
           address: string | null
           avatar_url: string | null
-          created_at: string | null
+          created_at: string
           date_of_birth: string | null
           emergency_contact: string | null
           emergency_contact_phone: string | null
@@ -190,12 +216,12 @@ export type Database = {
           health_notes: string | null
           id: string
           phone: string | null
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
           address?: string | null
           avatar_url?: string | null
-          created_at?: string | null
+          created_at?: string
           date_of_birth?: string | null
           emergency_contact?: string | null
           emergency_contact_phone?: string | null
@@ -203,12 +229,12 @@ export type Database = {
           health_notes?: string | null
           id: string
           phone?: string | null
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
           address?: string | null
           avatar_url?: string | null
-          created_at?: string | null
+          created_at?: string
           date_of_birth?: string | null
           emergency_contact?: string | null
           emergency_contact_phone?: string | null
@@ -216,58 +242,43 @@ export type Database = {
           health_notes?: string | null
           id?: string
           phone?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      "test table": {
-        Row: {
-          test: string
-          "test 2": number
-        }
-        Insert: {
-          test: string
-          "test 2": number
-        }
-        Update: {
-          test?: string
-          "test 2"?: number
+          updated_at?: string
         }
         Relationships: []
       }
       user_memberships: {
         Row: {
           created_at: string | null
-          end_date: string | null
+          end_date: string
           id: string
-          membership_id: string | null
+          membership_id: string
           payment_status: string | null
-          start_date: string | null
+          start_date: string
           status: string | null
           updated_at: string | null
-          user_id: string | null
+          user_id: string
         }
         Insert: {
           created_at?: string | null
-          end_date?: string | null
+          end_date: string
           id?: string
-          membership_id?: string | null
+          membership_id: string
           payment_status?: string | null
-          start_date?: string | null
+          start_date?: string
           status?: string | null
           updated_at?: string | null
-          user_id?: string | null
+          user_id: string
         }
         Update: {
           created_at?: string | null
-          end_date?: string | null
+          end_date?: string
           id?: string
-          membership_id?: string | null
+          membership_id?: string
           payment_status?: string | null
-          start_date?: string | null
+          start_date?: string
           status?: string | null
           updated_at?: string | null
-          user_id?: string | null
+          user_id?: string
         }
         Relationships: [
           {
@@ -277,26 +288,33 @@ export type Database = {
             referencedRelation: "memberships"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "user_memberships_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       user_roles: {
         Row: {
           created_at: string | null
           id: string
-          role: string
-          user_id: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
         }
         Insert: {
           created_at?: string | null
           id?: string
-          role: string
-          user_id?: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
         }
         Update: {
           created_at?: string | null
           id?: string
-          role?: string
-          user_id?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
         }
         Relationships: []
       }
@@ -305,10 +323,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_valid_membership: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "staff" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -435,6 +460,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "staff", "member"],
+    },
   },
 } as const
