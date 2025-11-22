@@ -386,7 +386,7 @@ const Dashboard = () => {
                 </div>
                 {membershipStatus !== "active" && (
                   <Button onClick={() => navigate("/managememberships")} variant="outline">
-                    Renew Membership
+                    Start Membership
                   </Button>
                 )}
               </div>

@@ -104,17 +104,21 @@ export default function ManageMemberships() {
       if (membershipError) throw membershipError;
       setMembership(membershipData);
 
-      // Fetch user's current membership
-      const { data: userMembershipData, error: userMembershipError } = await supabase
-        .from("user_memberships")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+      // Fetch user's current membership for THIS specific membership
+      // First get the membership, then check if user has it
+      if (membershipData) {
+        const { data: userMembershipData, error: userMembershipError } = await supabase
+          .from("user_memberships")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("membership_id", membershipData.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-      if (userMembershipError) throw userMembershipError;
-      setUserMembership(userMembershipData);
+        if (userMembershipError) throw userMembershipError;
+        setUserMembership(userMembershipData);
+      }
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -143,13 +147,8 @@ export default function ManageMemberships() {
       if (error) throw error;
 
       if (data?.url) {
-        // Redirect to Stripe checkout
-        window.open(data.url, "_blank");
-        
-        toast({
-          title: "Redirecting to Payment",
-          description: "Opening Stripe checkout in a new tab...",
-        });
+        // Redirect to Stripe checkout in the same window
+        window.location.href = data.url;
       }
     } catch (error: any) {
       toast({
@@ -213,12 +212,8 @@ export default function ManageMemberships() {
       if (error) throw error;
 
       if (data?.url) {
-        window.open(data.url, "_blank");
-        
-        toast({
-          title: "Redirecting to Payment",
-          description: "Opening Stripe checkout to renew your membership...",
-        });
+        // Redirect to Stripe checkout in the same window
+        window.location.href = data.url;
       }
     } catch (error: any) {
       toast({
@@ -239,7 +234,13 @@ export default function ManageMemberships() {
     );
   }
 
+  // Check if user has an active membership (for badge display)
   const isActive = userMembership?.status === "active" && new Date(userMembership.end_date) > new Date();
+  
+  // Check if user has an active membership for THIS specific membership (for button logic)
+  const hasActiveMembership = userMembership?.status === "active" && 
+                              new Date(userMembership.end_date) > new Date() &&
+                              userMembership.membership_id === membership?.id;
   const isExpired = userMembership && new Date(userMembership.end_date) <= new Date();
   const isCancelled = userMembership?.status === "cancelled";
 
@@ -293,14 +294,16 @@ export default function ManageMemberships() {
             </p>
 
             <div className="flex gap-3 flex-wrap">
-              {!userMembership && (
+              {/* Only show "Start Membership" if user doesn't have this specific membership active */}
+              {!hasActiveMembership && (
                 <Button onClick={handleRegister} disabled={actionLoading}>
                   {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Register Membership
+                  Start Membership
                 </Button>
               )}
 
-              {userMembership && isActive && (
+              {/* Show renew and cancel options if user has active membership for this specific membership */}
+              {hasActiveMembership && (
                 <>
                   <Button onClick={handleRenew} disabled={actionLoading}>
                     {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -313,7 +316,11 @@ export default function ManageMemberships() {
                 </>
               )}
 
-              {userMembership && (isExpired || isCancelled) && (
+              {/* Show reactivate option if user has this membership but it's expired or cancelled */}
+              {userMembership && 
+               userMembership.membership_id === membership?.id && 
+               (isExpired || isCancelled) && 
+               !hasActiveMembership && (
                 <Button onClick={handleRenew} disabled={actionLoading}>
                   {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Reactivate Membership
