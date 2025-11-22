@@ -36,6 +36,9 @@ mars-space-gym-buddy/
 │   │   └── qr/                    # QR code components
 │   │       ├── QRCodeDisplay.tsx  # QR code display component
 │   │       └── QRCodeScanner.tsx  # QR code scanner component
+│   │   └── calendar/              # Calendar components
+│   │       ├── ClassCalendarView.tsx  # Calendar view for classes (member view)
+│   │       └── AdminCalendarView.tsx  # Calendar view for admin session management
 │   ├── hooks/                     # Custom React hooks
 │   │   ├── useAuth.ts             # Authentication hook (✅ implemented)
 │   │   ├── useAdminAuth.ts        # Admin authentication hook
@@ -918,12 +921,26 @@ The Landing page (`src/pages/Landing.tsx`) includes:
 
 ### Classes Page Features
 The Classes page (`src/pages/Classes.tsx`) includes:
+- **Dual View Modes**: 
+  - Grid view: Card-based layout showing all available sessions
+  - Calendar view: Monthly calendar grid with day view for detailed scheduling
+- **Calendar View Features**:
+  - Monthly 30-day calendar grid showing available classes
+  - Pill-shaped session labels in date cells showing class name
+  - Click date to view detailed day agenda
+  - Day view with vertical timeline showing all sessions for selected day
+  - Week strip navigation for easy date selection
+  - Session details include: class name, instructor, time, duration, availability
 - **Real-time availability**: Shows available spots vs capacity for each class session
 - **Booking integration**: Uses `useBookings` hook for booking functionality
 - **User bookings display**: Shows which classes the user has already booked
 - **Booking confirmation**: Dialog confirms booking details before creating
-- **Search functionality**: Search classes by name or instructor
-- **Filters**: Filter by instructor, date (today, this week, upcoming, my bookings)
+- **Advanced Filtering**: 
+  - Search by class name, instructor, or class template name
+  - Filter by class name (from class templates)
+  - Filter by fitness category
+  - Filter by instructor
+  - Filter by date (today, this week, upcoming, my bookings)
 - **Visual indicators**: Badges show "Full", "Few Spots Left", or "Booked" status
 - **Error handling**: Toast notifications for booking success/failure
 - **Date formatting**: Uses `date-fns` for readable date/time display
@@ -1141,6 +1158,17 @@ The AdminManageClasses page (`src/pages/AdminManageClasses.tsx`) includes:
   - Configurable number of sessions (1-52)
   - Pre-fills session details from class template (name, instructor, capacity)
   - Smart end time calculation based on duration
+- **Calendar View for Session Management**:
+  - Monthly calendar grid showing all scheduled sessions
+  - Click date to view detailed day agenda
+  - Day view with vertical timeline (6 AM - 10 PM)
+  - Add new sessions directly from calendar day view
+  - Edit sessions inline with quick actions (edit/delete buttons)
+  - Delete sessions with confirmation dialog
+  - Week strip navigation for easy date selection
+  - Visual session blocks showing class name, instructor, time, duration, capacity
+  - Category badges for easy identification
+  - Link sessions to class templates (optional)
 - **Class Capacity Management**:
   - View all sessions with capacity information
   - See booked vs available spots for each session
@@ -1159,7 +1187,7 @@ The AdminManageClasses page (`src/pages/AdminManageClasses.tsx`) includes:
   - Filter by category
   - Filter by instructor
   - Real-time filtering as you type
-- **Tabbed Interface**: Organized into Classes, Sessions, and Instructors tabs
+- **Tabbed Interface**: Organized into Classes, Sessions, Calendar, and Instructors tabs
 - **Database relationship**: Sessions linked to classes via `class_id` foreign key (nullable for standalone sessions)
 - **Real-time Data**: Fetches latest classes, sessions, bookings, and instructor data
 - **Loading States**: Loading spinner during data fetch

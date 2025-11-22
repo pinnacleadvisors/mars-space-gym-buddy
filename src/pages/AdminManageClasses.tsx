@@ -37,6 +37,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadingSpinner } from "@/components/loading/LoadingSpinner";
 import { showErrorToast, showSuccessToast } from "@/lib/utils/toastHelpers";
+import { AdminCalendarView } from "@/components/calendar/AdminCalendarView";
 import {
   Form,
   FormControl,
@@ -135,7 +136,7 @@ const AdminManageClasses = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [instructorFilter, setInstructorFilter] = useState<string>("all");
-  const [activeTab, setActiveTab] = useState<"classes" | "sessions" | "instructors">("classes");
+  const [activeTab, setActiveTab] = useState<"classes" | "sessions" | "instructors" | "calendar">("classes");
 
   const classForm = useForm<ClassFormData>({
     resolver: zodResolver(classSchema),
@@ -482,6 +483,65 @@ const AdminManageClasses = () => {
     }
   };
 
+  const handleAddSessionFromCalendar = async (sessionData: Omit<ClassSession, "id" | "created_at">) => {
+    try {
+      const { error } = await supabase
+        .from("class_sessions")
+        .insert([sessionData]);
+
+      if (error) throw error;
+
+      showSuccessToast("Session created successfully");
+      await fetchSessions();
+    } catch (error: any) {
+      showErrorToast({
+        title: "Error",
+        description: error.message || "Failed to create session",
+      });
+      throw error;
+    }
+  };
+
+  const handleEditSessionFromCalendar = async (sessionId: string, sessionData: Partial<ClassSession>) => {
+    try {
+      const { error } = await supabase
+        .from("class_sessions")
+        .update(sessionData)
+        .eq("id", sessionId);
+
+      if (error) throw error;
+
+      showSuccessToast("Session updated successfully");
+      await fetchSessions();
+    } catch (error: any) {
+      showErrorToast({
+        title: "Error",
+        description: error.message || "Failed to update session",
+      });
+      throw error;
+    }
+  };
+
+  const handleDeleteSessionFromCalendar = async (sessionId: string) => {
+    try {
+      const { error } = await supabase
+        .from("class_sessions")
+        .delete()
+        .eq("id", sessionId);
+
+      if (error) throw error;
+
+      showSuccessToast("Session deleted successfully");
+      await fetchSessions();
+    } catch (error: any) {
+      showErrorToast({
+        title: "Error",
+        description: error.message || "Failed to delete session",
+      });
+      throw error;
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -657,6 +717,7 @@ const AdminManageClasses = () => {
         <TabsList>
           <TabsTrigger value="classes">Classes</TabsTrigger>
           <TabsTrigger value="sessions">Sessions</TabsTrigger>
+          <TabsTrigger value="calendar">Calendar</TabsTrigger>
           <TabsTrigger value="instructors">Instructors</TabsTrigger>
         </TabsList>
 
@@ -848,6 +909,25 @@ const AdminManageClasses = () => {
                   </Table>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Calendar Tab */}
+        <TabsContent value="calendar" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Session Calendar</CardTitle>
+              <CardDescription>View and manage class sessions in calendar format</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AdminCalendarView
+                sessions={sessions}
+                classes={classes}
+                onAddSession={handleAddSessionFromCalendar}
+                onEditSession={handleEditSessionFromCalendar}
+                onDeleteSession={handleDeleteSessionFromCalendar}
+              />
             </CardContent>
           </Card>
         </TabsContent>
