@@ -140,6 +140,9 @@ export const BookingsCalendarView = ({
             ))}
           </div>
 
+          {/* Horizontal separator */}
+          <div className="border-t border-border" />
+
           {/* Calendar grid with week separators */}
           <div className="space-y-0">
             {Array.from({ length: Math.ceil(calendarDays.length / 7) }, (_, weekIndex) => {

@@ -995,29 +995,29 @@ const AdminManageClasses = () => {
                               <div className="flex justify-end gap-2">
                                 <Button
                                   variant="outline"
-                                  size="sm"
+                                  size="icon"
                                   onClick={() => {
                                     setEditingSession(session);
                                     setCapacityDialogOpen(true);
                                   }}
+                                  title="Edit Capacity"
                                 >
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit Capacity
+                                  <Edit className="w-4 h-4" />
                                 </Button>
                                 <Button
                                   variant="outline"
-                                  size="sm"
+                                  size="icon"
                                   onClick={() => {
                                     setEditingSession(session);
                                     setSessionEditDialogOpen(true);
                                   }}
+                                  title="Edit Session"
                                 >
-                                  <Pencil className="w-4 h-4 mr-2" />
-                                  Edit
+                                  <Pencil className="w-4 h-4" />
                                 </Button>
                                 <Button
                                   variant="destructive"
-                                  size="sm"
+                                  size="icon"
                                   onClick={async () => {
                                     if (confirm(`Are you sure you want to delete the session "${session.name}"? This action cannot be undone.`)) {
                                       try {
@@ -1027,9 +1027,9 @@ const AdminManageClasses = () => {
                                       }
                                     }
                                   }}
+                                  title="Delete Session"
                                 >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete
+                                  <Trash2 className="w-4 h-4" />
                                 </Button>
                               </div>
                             </TableCell>
