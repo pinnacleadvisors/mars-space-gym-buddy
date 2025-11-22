@@ -1377,10 +1377,10 @@ const AdminManageClasses = () => {
               <div>
                 <Label>Link to Class Template (Optional)</Label>
                 <Select
-                  value={editingSession.class_id || ""}
+                  value={editingSession.class_id || "none"}
                   onValueChange={(value) => {
                     if (editingSession) {
-                      setEditingSession({ ...editingSession, class_id: value || null });
+                      setEditingSession({ ...editingSession, class_id: value === "none" ? null : value });
                     }
                   }}
                 >
@@ -1388,7 +1388,7 @@ const AdminManageClasses = () => {
                     <SelectValue placeholder="Select a class" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {classes.map((cls) => (
                       <SelectItem key={cls.id} value={cls.id}>
                         {cls.name}

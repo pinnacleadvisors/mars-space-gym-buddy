@@ -119,6 +119,7 @@ export const AdminCalendarView = ({
   };
 
   const handleAddSession = () => {
+    setEditingSession(null);
     setNewSession({
       name: "",
       instructor: "",
@@ -126,9 +127,10 @@ export const AdminCalendarView = ({
       startTime: "09:00",
       endTime: "10:00",
       capacity: 20,
-      class_id: "",
+      class_id: "none",
     });
     setShowAddDialog(true);
+    setShowEditDialog(false);
   };
 
   const handleEditSession = (session: Session) => {
@@ -141,14 +143,17 @@ export const AdminCalendarView = ({
       startTime: format(startTime, "HH:mm"),
       endTime: format(parseISO(session.end_time), "HH:mm"),
       capacity: session.capacity || 20,
-      class_id: session.class_id || "",
+      class_id: session.class_id || "none",
     });
     setShowEditDialog(true);
+    setShowAddDialog(false);
   };
 
   const handleDeleteSession = (session: Session) => {
     setEditingSession(session);
     setShowDeleteDialog(true);
+    setShowAddDialog(false);
+    setShowEditDialog(false);
   };
 
   const handleSaveSession = async () => {
@@ -169,7 +174,7 @@ export const AdminCalendarView = ({
         start_time: startDateTime.toISOString(),
         end_time: endDateTime.toISOString(),
         capacity: newSession.capacity,
-        class_id: newSession.class_id || null,
+        class_id: (newSession.class_id && newSession.class_id !== "none") ? newSession.class_id : null,
       };
 
       if (editingSession) {
@@ -366,12 +371,12 @@ export const AdminCalendarView = ({
             </div>
             <div>
               <Label>Link to Class Template (Optional)</Label>
-              <Select value={newSession.class_id} onValueChange={(value) => setNewSession({ ...newSession, class_id: value })}>
+              <Select value={newSession.class_id || "none"} onValueChange={(value) => setNewSession({ ...newSession, class_id: value === "none" ? "" : value })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a class" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {classes.map((cls) => (
                     <SelectItem key={cls.id} value={cls.id}>
                       {cls.name}
@@ -631,7 +636,7 @@ const DayView = ({
                               key={session.id}
                               className="p-4 rounded-lg border bg-card hover:shadow-md transition-colors"
                             >
-                              <div className="flex items-start justify-between">
+                              <div className="flex items-start justify-between" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-1">
                                     <h4 className="font-semibold">{session.name}</h4>
@@ -658,14 +663,20 @@ const DayView = ({
                                   <Button
                                     variant="outline"
                                     size="icon"
-                                    onClick={() => onEditSession(session)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onEditSession(session);
+                                    }}
                                   >
                                     <Pencil className="h-4 w-4" />
                                   </Button>
                                   <Button
                                     variant="outline"
                                     size="icon"
-                                    onClick={() => onDeleteSession(session)}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDeleteSession(session);
+                                    }}
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
