@@ -23,6 +23,7 @@ import AdminAnalytics from "./pages/AdminAnalytics";
 import AdminManageClasses from "./pages/AdminManageClasses";
 import AdminManageMemberships from "./pages/AdminManageMemberships";
 import AdminUserMemberships from "./pages/AdminUserMemberships";
+import AdminManageDeals from "./pages/AdminManageDeals";
 import ManageMemberships from "./pages/ManageMemberships";
 import Profile from "./pages/Profile";
 import Rewards from "./pages/Rewards";
@@ -182,6 +183,14 @@ const App = () => {
               element={
                 <AdminRoute>
                   <AdminRewardClaim />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/managedeals"
+              element={
+                <AdminRoute>
+                  <AdminManageDeals />
                 </AdminRoute>
               }
             />

@@ -16,6 +16,7 @@ import {
   UserCog,
   Trophy,
   Settings,
+  Ticket,
 } from "lucide-react";
 import {
   Sidebar,
@@ -95,6 +96,7 @@ export function AppSidebar() {
     { icon: Dumbbell, label: "Manage Classes", path: "/admin/manageclasses" },
     { icon: CreditCard, label: "Memberships", path: "/admin/memberships" },
     { icon: UserCog, label: "User Memberships", path: "/admin/usermemberships" },
+    { icon: Ticket, label: "Deals & Referrals", path: "/admin/managedeals" },
   ];
   
   

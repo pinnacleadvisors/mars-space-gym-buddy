@@ -72,7 +72,8 @@ mars-space-gym-buddy/
 │   │   └── validations/          # Zod validation schemas
 │   │       ├── auth.ts            # Authentication form schemas
 │   │       ├── class.ts           # Class and session schemas
-│   │       └── membership.ts      # Membership schemas
+│   │       ├── membership.ts      # Membership schemas
+│   │       └── coupon.ts         # Coupon code validation schemas
 │   ├── pages/                     # Page components
 │   │   ├── Landing.tsx            # Landing page (high-end welcome/onboarding screen with hero background, logo, premium typography)
 │   │   ├── Login.tsx              # User login
@@ -95,6 +96,7 @@ mars-space-gym-buddy/
 │   │   ├── AdminManageClasses.tsx # Class management (✅ fully implemented with improved UI, bulk creation, capacity management, instructor management)
 │   │   ├── AdminManageMemberships.tsx # Membership management (✅ fully implemented with plan creation/editing, statistics, renewal reminders)
 │   │   ├── AdminUserMemberships.tsx   # User membership management
+│   │   ├── AdminManageDeals.tsx       # Deals & Referrals management (✅ fully implemented with coupon code CRUD, usage tracking, statistics)
 │   │   ├── AdminRewardClaim.tsx       # Reward claim scanner (✅ for staff to scan member QR codes)
 │   │   └── NotFound.tsx           # 404 page
 │   └── types/                     # TypeScript type definitions
@@ -115,7 +117,8 @@ mars-space-gym-buddy/
 │   └── migrations/                # Database migrations (run in Supabase Dashboard SQL Editor)
 │       ├── RESET_DATABASE.sql     # Resets database (drops all tables, functions, types, and policies)
 │       ├── COMPLETE_SCHEMA_SETUP.sql # Complete database schema setup from scratch
-│       └── ADD_REWARD_CLAIMS.sql  # Adds reward_claims table and claim_reward() function
+│       ├── ADD_REWARD_CLAIMS.sql  # Adds reward_claims table and claim_reward() function
+│       └── ADD_COUPON_CODES.sql   # Adds coupon_codes and coupon_usage tables with validation functions
 ├── scripts/                       # Utility scripts
 │   ├── sync-database-types.sh    # Script to sync database types from GitHub
 │   └── watch-database-types.sh   # Watch script for auto-pulling type updates
@@ -174,9 +177,11 @@ mars-space-gym-buddy/
 - **Schema Definition**: Manually set up in Supabase Dashboard following the guide in `docs/DATABASE_SCHEMA_SETUP.md`
 - **TypeScript Types**: Auto-generated to `src/types/database.ts` via GitHub Actions workflow
 - **Type Sync**: Run `npm run sync:types` or `npm run watch:types` to pull latest schema changes
-- **Migration Files**: Two migration files available in `supabase/migrations/`:
+- **Migration Files**: Migration files available in `supabase/migrations/`:
   - `RESET_DATABASE.sql`: Drops all tables, functions, types, and policies (use with caution)
   - `COMPLETE_SCHEMA_SETUP.sql`: Complete database schema setup from scratch (run after RESET_DATABASE.sql or for fresh setup)
+  - `ADD_REWARD_CLAIMS.sql`: Adds reward_claims table and claim_reward() function
+  - `ADD_COUPON_CODES.sql`: Adds coupon_codes and coupon_usage tables with validation functions
 - **Reference**: Always check `src/types/database.ts` for the current database schema state
 
 **📖 Reading the Schema**:
@@ -328,6 +333,48 @@ mars-space-gym-buddy/
   - `idx_reward_claims_claimed_at` on `claimed_at`
   - `idx_reward_claims_qr_timestamp_session` on `qr_timestamp, qr_session_id` (prevents duplicate claims)
 
+#### `coupon_codes`
+- **Purpose**: Discount and referral coupon code definitions
+- **Columns**:
+  - `id` (uuid, PK)
+  - `code` (text, unique) - Coupon code (uppercase, alphanumeric with hyphens/underscores)
+  - `type` (coupon_type enum: 'percentage', 'money_off') - Discount type
+  - `value` (numeric(10,2)) - Percentage (0-100) or amount in pounds
+  - `description` (text, nullable) - Optional description
+  - `is_active` (boolean, default true) - Whether coupon is active
+  - `usage_limit` (integer, nullable) - Maximum number of uses (NULL = unlimited)
+  - `valid_from` (timestamptz, default now()) - Start date for validity
+  - `valid_until` (timestamptz, nullable) - End date for validity (NULL = no expiration)
+  - `created_at` (timestamptz, default now())
+  - `updated_at` (timestamptz, default now())
+  - `created_by` (uuid, FK → profiles, nullable) - Admin who created the coupon
+- **RLS**: 
+  - Anyone can view active coupons (for public use)
+  - Admins can view/insert/update/delete all coupons (`has_role(auth.uid(), 'admin')`)
+- **Indexes**: 
+  - `idx_coupon_codes_code` on `code`
+  - `idx_coupon_codes_is_active` on `is_active`
+  - `idx_coupon_codes_valid_dates` on `valid_from, valid_until`
+  - `idx_coupon_codes_created_by` on `created_by`
+- **Trigger**: Auto-updates `updated_at` on update
+
+#### `coupon_usage`
+- **Purpose**: Track when and by whom coupons are used
+- **Columns**:
+  - `id` (uuid, PK)
+  - `coupon_id` (uuid, FK → coupon_codes, ON DELETE CASCADE)
+  - `user_id` (uuid, FK → profiles, ON DELETE CASCADE)
+  - `used_at` (timestamptz, default now()) - Timestamp when coupon was used
+  - `order_id` (text, nullable) - For future Stripe integration
+  - `created_at` (timestamptz, default now())
+- **RLS**: 
+  - Users can view/insert own coupon usage (`auth.uid() = user_id`)
+  - Admins can view/insert all coupon usage (`has_role(auth.uid(), 'admin')`)
+- **Indexes**: 
+  - `idx_coupon_usage_coupon_id` on `coupon_id`
+  - `idx_coupon_usage_user_id` on `user_id`
+  - `idx_coupon_usage_used_at` on `used_at`
+
 ### Database Functions
 
 #### `has_role(_user_id uuid, _role app_role) → boolean`
@@ -353,6 +400,21 @@ mars-space-gym-buddy/
   - Returns success/error result
 - **Returns**: JSON object with `success`, `message`, `error`, and `claimed_at` fields
 
+#### `get_coupon_usage_count(_coupon_id uuid) → integer`
+- **Purpose**: Returns the number of times a coupon has been used
+- **Security**: SECURITY DEFINER
+- **Usage**: Used in admin interface to display usage statistics
+
+#### `is_coupon_valid(_code text) → boolean`
+- **Purpose**: Checks if a coupon code is valid (active, within date range, not exceeded usage limit)
+- **Security**: SECURITY DEFINER
+- **Logic**: 
+  - Checks if coupon exists
+  - Validates coupon is active
+  - Validates current date is within valid_from and valid_until range
+  - Checks if usage limit has been reached
+- **Returns**: true if coupon is valid and can be used, false otherwise
+
 #### `update_updated_at_column()`
 - **Purpose**: Trigger function to update `updated_at` timestamp
 - **Applied to**: profiles, classes, user_memberships
@@ -372,6 +434,7 @@ mars-space-gym-buddy/
 ### Database Enums
 
 - **`app_role`**: 'admin', 'staff', 'member'
+- **`coupon_type`**: 'percentage', 'money_off'
 
 ## 🔐 Environment Variables & Secrets
 
@@ -477,7 +540,7 @@ Used in `.github/workflows/github-actions-demo.yml`:
 - `/admin/manageclasses` - Class management
 - `/admin/memberships` - Membership plan management
 - `/admin/usermemberships` - User membership management
-- `/admin/reward-claim` - Reward claim scanner (for staff to scan member QR codes)
+- `/admin/managedeals` - Deals & Referrals management (coupon code CRUD, usage tracking)
 - `/admin/reward-claim` - Reward claim scanner (for staff to scan member QR codes)
 
 **Note**: All admin routes are wrapped with `AdminRoute` component which:
@@ -1138,6 +1201,61 @@ The AdminManageMemberships page (`src/pages/AdminManageMemberships.tsx`) include
 
 **Note**: Membership assignment to users is handled via the AdminUserMemberships page (`/admin/usermemberships`), which provides full CRUD functionality for user memberships.
 
+### Admin Deals & Referrals Management Features
+The AdminManageDeals page (`src/pages/AdminManageDeals.tsx`) includes:
+- **Coupon Code Creation/Editing**:
+  - Create and edit discount/referral coupon codes
+  - Two coupon types: percentage off (0-100%) and money off (fixed amount in pounds)
+  - Form validation using Zod schemas with helpful error messages
+  - Delete coupons (with confirmation)
+  - Unique coupon codes (uppercase, alphanumeric with hyphens/underscores)
+- **Coupon Configuration**:
+  - Active/inactive toggle for enabling/disabling coupons
+  - Usage limit (optional, leave empty for unlimited uses)
+  - Valid from/until date range (optional expiration)
+  - Description field for internal notes
+  - Created by tracking (admin who created the coupon)
+- **Usage Tracking**:
+  - Real-time usage count per coupon (shows X / limit or ∞)
+  - Click coupon row to filter usage history
+  - Usage history table showing:
+    - Coupon code used
+    - User who used it
+    - Discount amount/percentage
+    - Timestamp when used
+    - Order ID (for future Stripe integration)
+- **Statistics Dashboard**:
+  - Total coupons count
+  - Active coupons count
+  - Inactive coupons count
+  - Total uses across all coupons
+  - Unique users who have used coupons
+- **Status Indicators**:
+  - Active: Green badge (coupon is active and valid)
+  - Inactive: Red badge (manually disabled)
+  - Expired: Red badge (past valid_until date)
+  - Not Started: Gray badge (before valid_from date)
+  - Limit Reached: Red badge (usage limit exceeded)
+- **Tabbed Interface**: Organized into Coupon Codes, Statistics, and Usage History
+- **Real-time Data**: Fetches latest coupon data, usage statistics, and usage history
+- **Loading States**: Loading spinner during data fetch
+- **Error Handling**: Toast notifications for all operations
+- **Form Validation**: Comprehensive validation with helpful error messages
+  - Percentage values must be 0-100
+  - Money off values must be positive
+  - Valid until date must be after valid from date
+  - Coupon code format validation (uppercase, alphanumeric, hyphens, underscores)
+
+**Database Integration:**
+- `coupon_codes` table stores all coupon definitions
+- `coupon_usage` table tracks each time a coupon is used
+- `get_coupon_usage_count()` function returns usage count per coupon
+- `is_coupon_valid()` function validates coupon eligibility (active, within date range, not exceeded limit)
+
+**Migration File:**
+- `supabase/migrations/ADD_COUPON_CODES.sql`: Creates `coupon_codes` and `coupon_usage` tables with validation functions
+- Run this migration in Supabase Dashboard SQL Editor to enable coupon management
+
 ### Admin Class Management Features
 The AdminManageClasses page (`src/pages/AdminManageClasses.tsx`) includes:
 - **Class Creation/Editing**:
@@ -1325,6 +1443,7 @@ const handleSubmit = async (data: RegisterFormData) => {
 - `src/lib/validations/auth.ts`: Login, Register, ForgotPassword, ResetPassword schemas
 - `src/lib/validations/class.ts`: Class and session creation schemas
 - `src/lib/validations/membership.ts`: Membership creation schemas
+- `src/lib/validations/coupon.ts`: Coupon code creation/update schemas
 
 **Password Requirements:**
 - Minimum 8 characters
