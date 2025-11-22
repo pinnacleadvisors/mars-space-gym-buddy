@@ -28,14 +28,16 @@ import { format, parseISO, isAfter, isBefore, startOfToday, isSameDay } from "da
 import { Calendar } from "@/components/ui/calendar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BookingCardSkeletons } from "@/components/loading/BookingCardSkeleton";
+import { BookingsCalendarView } from "@/components/calendar/BookingsCalendarView";
 
 const Bookings = () => {
-  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("calendar");
+  const [calendarViewMode, setCalendarViewMode] = useState<"month" | "day">("month");
   const [selectedBooking, setSelectedBooking] = useState<BookingWithDetails | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   const { toast } = useToast();
   const { bookings, loading, cancelBooking, refreshBookings } = useBookings();
@@ -77,27 +79,14 @@ const Bookings = () => {
     return { upcomingBookings: upcoming, pastBookings: past };
   }, [bookings]);
 
-  // Filter bookings by selected date (for calendar view)
-  const filteredBookings = useMemo(() => {
-    if (!selectedDate) return bookings;
-    return bookings.filter((booking) => {
-      if (!booking.class_sessions?.start_time) return false;
-      const bookingDate = parseISO(booking.class_sessions.start_time);
-      return isSameDay(bookingDate, selectedDate);
-    });
-  }, [bookings, selectedDate]);
+  const handleBookingClick = (booking: BookingWithDetails) => {
+    setSelectedBooking(booking);
+    setShowDetailsDialog(true);
+  };
 
-  // Get dates with bookings for calendar
-  const datesWithBookings = useMemo(() => {
-    const dates = new Set<string>();
-    bookings.forEach((booking) => {
-      if (booking.class_sessions?.start_time) {
-        const date = parseISO(booking.class_sessions.start_time);
-        dates.add(format(date, "yyyy-MM-dd"));
-      }
-    });
-    return Array.from(dates).map((d) => parseISO(d));
-  }, [bookings]);
+  const handleDateClick = (date: Date) => {
+    setSelectedDate(date);
+  };
 
   const handleViewDetails = (booking: BookingWithDetails) => {
     setSelectedBooking(booking);
@@ -262,56 +251,14 @@ const Bookings = () => {
             </TabsContent>
           </Tabs>
         ) : (
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Calendar</CardTitle>
-                <CardDescription>Select a date to view bookings</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  className="rounded-md border"
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>
-                  {selectedDate
-                    ? `Bookings on ${format(selectedDate, "MMMM d, yyyy")}`
-                    : "Select a date"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {!selectedDate ? (
-                  <p className="text-muted-foreground text-center py-8">
-                    Click on a date in the calendar to view bookings
-                  </p>
-                ) : filteredBookings.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">
-                    No bookings on this date
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {filteredBookings.map((booking) => (
-                      <BookingCard
-                        key={booking.id}
-                        booking={booking}
-                        onViewDetails={handleViewDetails}
-                        onCancel={handleCancelClick}
-                        getStatusBadge={getStatusBadge}
-                        canCancel={canCancel}
-                      />
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          <BookingsCalendarView
+            bookings={bookings}
+            selectedDate={selectedDate}
+            viewMode={calendarViewMode}
+            onViewModeChange={setCalendarViewMode}
+            onDateClick={handleDateClick}
+            onBookingClick={handleBookingClick}
+          />
         )}
 
         {/* Booking Details Dialog */}
