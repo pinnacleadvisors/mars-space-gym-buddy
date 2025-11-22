@@ -38,7 +38,8 @@ mars-space-gym-buddy/
 │   │       └── QRCodeScanner.tsx  # QR code scanner component
 │   │   └── calendar/              # Calendar components
 │   │       ├── ClassCalendarView.tsx  # Calendar view for classes (member view)
-│   │       └── AdminCalendarView.tsx  # Calendar view for admin session management
+│   │       ├── AdminCalendarView.tsx  # Calendar view for admin session management
+│   │       └── BookingsCalendarView.tsx  # Calendar view for user bookings
 │   ├── hooks/                     # Custom React hooks
 │   │   ├── useAuth.ts             # Authentication hook (✅ implemented)
 │   │   ├── useAdminAuth.ts        # Admin authentication hook
@@ -1115,15 +1116,26 @@ The Settings page (`src/pages/Settings.tsx`) includes:
 ### Bookings Page Features
 The Bookings page (`src/pages/Bookings.tsx`) includes:
 - **Real bookings data**: Uses `useBookings` hook to fetch and display user's actual bookings
-- **List and Calendar views**: Toggle between list view and calendar view
-- **Upcoming vs Past tabs**: Separate tabs for upcoming and past bookings
-- **Booking status display**: Shows status badges (Booked, Cancelled, Attended, No Show)
-- **Cancel booking**: Full cancel functionality with 24-hour policy validation
-- **Booking details dialog**: View complete booking information
-- **Date filtering**: Calendar view allows selecting dates to filter bookings
-- **Smart sorting**: Upcoming sorted by earliest first, past sorted by most recent first
-- **Cancel validation**: Only shows cancel button when cancellation is allowed (24+ hours before class)
+- **List and Calendar views**: Toggle between list view and calendar view (calendar view is default)
+- **Calendar View Features**:
+  - Monthly 30-day calendar grid showing all user bookings
+  - Pill-shaped booking labels in date cells showing class name
+  - Click date to view detailed day agenda
+  - Day view with vertical timeline (6 AM - 10 PM) showing all bookings for selected day
+  - Week strip navigation for easy date selection
+  - Booking details include: class name, instructor, time, duration, capacity, status
+  - Visual status indicators (Booked, Cancelled, Attended, No Show)
+  - Cancelled bookings shown with strikethrough and reduced opacity
+- **List View Features**:
+  - **Upcoming vs Past tabs**: Separate tabs for upcoming and past bookings
+  - **Smart sorting**: Upcoming sorted by earliest first, past sorted by most recent first
+  - **Booking cards**: Display booking details with status badges
+- **Booking Management**:
+  - **Cancel booking**: Full cancel functionality with 24-hour policy validation
+  - **Booking details dialog**: View complete booking information
+  - **Cancel validation**: Only shows cancel button when cancellation is allowed (24+ hours before class)
 - **Error handling**: Toast notifications for all booking operations
+- **Click interactions**: Click bookings in calendar to view details or cancel
 
 ### Admin User Management Features
 The AdminUsers page (`src/pages/AdminUsers.tsx`) includes:
@@ -1278,6 +1290,8 @@ The AdminManageClasses page (`src/pages/AdminManageClasses.tsx`) includes:
   - Smart end time calculation based on duration
 - **Calendar View for Session Management**:
   - Monthly calendar grid showing all scheduled sessions
+  - Week separators: Horizontal lines between weeks in the calendar grid
+  - No day borders: Clean design without borders around individual day cells
   - Click date to view detailed day agenda
   - Day view with vertical timeline (6 AM - 10 PM)
   - Add new sessions directly from calendar day view
@@ -1287,6 +1301,7 @@ The AdminManageClasses page (`src/pages/AdminManageClasses.tsx`) includes:
   - Visual session blocks showing class name, instructor, time, duration, capacity
   - Category badges for easy identification
   - Link sessions to class templates (optional)
+  - Filter calendar view by instructor, class, and category
 - **Class Capacity Management**:
   - View all sessions with capacity information
   - See booked vs available spots for each session

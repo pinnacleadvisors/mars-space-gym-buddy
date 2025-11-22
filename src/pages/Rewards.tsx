@@ -25,7 +25,7 @@ const HOURS_TARGET = 15;
 const CLASSES_TARGET = 15;
 
 const Rewards = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [totalHours, setTotalHours] = useState<number>(0);
@@ -39,7 +39,9 @@ const Rewards = () => {
       setLoading(true);
 
       if (!user) {
-        throw new Error("User not found. Please log in again.");
+        // User not loaded yet or not authenticated - return early without error
+        setLoading(false);
+        return;
       }
 
       // Get the most recent reward claim
@@ -112,9 +114,15 @@ const Rewards = () => {
   };
 
   useEffect(() => {
-    fetchRewardsData();
+    // Only fetch data when auth is loaded and user is available
+    if (!authLoading && user) {
+      fetchRewardsData();
+    } else if (!authLoading && !user) {
+      // Auth loaded but no user - set loading to false
+      setLoading(false);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, authLoading]);
 
   const hoursProgress = Math.min((totalHours / HOURS_TARGET) * 100, 100);
   const classesProgress = Math.min((totalClasses / CLASSES_TARGET) * 100, 100);
