@@ -45,32 +45,144 @@ serve(async (req) => {
     
     logStep("User authenticated", { userId: user.id, email: user.email });
 
+    // Get user's active membership from database first
+    const { data: userMembership, error: membershipError } = await supabaseClient
+      .from("user_memberships")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (membershipError) {
+      logStep("Error fetching user membership", { error: membershipError });
+      throw new Error("Failed to fetch membership information");
+    }
+
+    if (!userMembership) {
+      throw new Error("No active membership found");
+    }
+
+    // Check if this is a Stripe membership
+    const isStripeMembership = userMembership.payment_method === 'stripe' || 
+                                userMembership.stripe_subscription_id !== null;
+
+    if (!isStripeMembership) {
+      // Non-Stripe membership - just update database status
+      logStep("Non-Stripe membership - cancelling in database only", { 
+        paymentMethod: userMembership.payment_method 
+      });
+      
+      const { error: updateError } = await supabaseClient
+        .from("user_memberships")
+        .update({
+          status: "cancelled",
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", userMembership.id);
+
+      if (updateError) {
+        logStep("Error updating membership status", { error: updateError });
+        throw updateError;
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        message: "Membership cancelled successfully"
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      });
+    }
+
+    // Stripe membership - cancel via Stripe
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { 
       apiVersion: "2025-08-27.basil" 
     });
 
-    // Find customer
-    const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    
-    if (customers.data.length === 0) {
-      throw new Error("No Stripe customer found");
+    // If we have stripe_subscription_id, use it directly
+    let subscription;
+    if (userMembership.stripe_subscription_id) {
+      try {
+        subscription = await stripe.subscriptions.retrieve(userMembership.stripe_subscription_id);
+        logStep("Retrieved subscription by ID", { subscriptionId: subscription.id });
+      } catch (error) {
+        logStep("Error retrieving subscription by ID, trying email lookup", { error });
+        // Fall back to email lookup
+        subscription = null;
+      }
     }
 
-    const customerId = customers.data[0].id;
-    logStep("Found Stripe customer", { customerId });
+    // If we don't have subscription yet, try email lookup
+    if (!subscription) {
+      const customers = await stripe.customers.list({ email: user.email, limit: 1 });
+      
+      if (customers.data.length === 0) {
+        // No Stripe customer but membership marked as Stripe - update database only
+        logStep("No Stripe customer found but membership is Stripe - cancelling in database only");
+        
+        const { error: updateError } = await supabaseClient
+          .from("user_memberships")
+          .update({
+            status: "cancelled",
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", userMembership.id);
 
-    // Get active subscription
-    const subscriptions = await stripe.subscriptions.list({
-      customer: customerId,
-      status: "active",
-      limit: 1,
-    });
+        if (updateError) {
+          logStep("Error updating membership status", { error: updateError });
+          throw updateError;
+        }
 
-    if (subscriptions.data.length === 0) {
-      throw new Error("No active subscription found");
+        return new Response(JSON.stringify({
+          success: true,
+          message: "Membership cancelled successfully"
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+
+      const customerId = customers.data[0].id;
+      logStep("Found Stripe customer", { customerId });
+
+      // Get active subscription
+      const subscriptions = await stripe.subscriptions.list({
+        customer: customerId,
+        status: "active",
+        limit: 1,
+      });
+
+      if (subscriptions.data.length === 0) {
+        // No active subscription but membership marked as Stripe - update database only
+        logStep("No active Stripe subscription found - cancelling in database only");
+        
+        const { error: updateError } = await supabaseClient
+          .from("user_memberships")
+          .update({
+            status: "cancelled",
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", userMembership.id);
+
+        if (updateError) {
+          logStep("Error updating membership status", { error: updateError });
+          throw updateError;
+        }
+
+        return new Response(JSON.stringify({
+          success: true,
+          message: "Membership cancelled successfully"
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        });
+      }
+
+      subscription = subscriptions.data[0];
     }
 
-    const subscription = subscriptions.data[0];
     logStep("Found active subscription", { subscriptionId: subscription.id });
 
     // Cancel subscription at period end
@@ -90,9 +202,7 @@ serve(async (req) => {
         status: "cancelled",
         updated_at: new Date().toISOString()
       })
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1);
+      .eq("id", userMembership.id);
 
     if (updateError) {
       logStep("Error updating membership status", { error: updateError });

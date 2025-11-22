@@ -112,6 +112,8 @@ serve(async (req) => {
         .update({
           status: "active",
           payment_status: "paid",
+          payment_method: "stripe",
+          stripe_subscription_id: subscription.id,
           end_date: currentPeriodEnd.toISOString(),
           updated_at: new Date().toISOString()
         })
@@ -120,7 +122,10 @@ serve(async (req) => {
       if (updateError) {
         logStep("Error updating membership", { error: updateError });
       } else {
-        logStep("Membership updated successfully");
+        logStep("Membership updated successfully", { 
+          subscriptionId: subscription.id,
+          paymentMethod: "stripe"
+        });
       }
     } else {
       // Create new membership record
@@ -133,13 +138,18 @@ serve(async (req) => {
           start_date: startDate.toISOString(),
           end_date: currentPeriodEnd.toISOString(),
           status: "active",
-          payment_status: "paid"
+          payment_status: "paid",
+          payment_method: "stripe",
+          stripe_subscription_id: subscription.id
         });
 
       if (insertError) {
         logStep("Error creating membership", { error: insertError });
       } else {
-        logStep("Membership created successfully");
+        logStep("Membership created successfully", { 
+          subscriptionId: subscription.id,
+          paymentMethod: "stripe"
+        });
       }
     }
 

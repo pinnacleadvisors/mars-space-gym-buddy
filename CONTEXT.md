@@ -119,7 +119,8 @@ mars-space-gym-buddy/
 │       ├── RESET_DATABASE.sql     # Resets database (drops all tables, functions, types, and policies)
 │       ├── COMPLETE_SCHEMA_SETUP.sql # Complete database schema setup from scratch
 │       ├── ADD_REWARD_CLAIMS.sql  # Adds reward_claims table and claim_reward() function
-│       └── ADD_COUPON_CODES.sql   # Adds coupon_codes and coupon_usage tables with validation functions
+│       ├── ADD_COUPON_CODES.sql   # Adds coupon_codes and coupon_usage tables with validation functions
+│       └── ADD_PAYMENT_METHOD_TO_USER_MEMBERSHIPS.sql  # Adds payment_method and stripe_subscription_id columns
 ├── scripts/                       # Utility scripts
 │   ├── sync-database-types.sh    # Script to sync database types from GitHub
 │   └── watch-database-types.sh   # Watch script for auto-pulling type updates
@@ -183,6 +184,7 @@ mars-space-gym-buddy/
   - `COMPLETE_SCHEMA_SETUP.sql`: Complete database schema setup from scratch (run after RESET_DATABASE.sql or for fresh setup)
   - `ADD_REWARD_CLAIMS.sql`: Adds reward_claims table and claim_reward() function
   - `ADD_COUPON_CODES.sql`: Adds coupon_codes and coupon_usage tables with validation functions
+  - `ADD_PAYMENT_METHOD_TO_USER_MEMBERSHIPS.sql`: Adds payment_method and stripe_subscription_id columns to user_memberships table
 - **Reference**: Always check `src/types/database.ts` for the current database schema state
 
 **📖 Reading the Schema**:
@@ -296,9 +298,16 @@ mars-space-gym-buddy/
   - `end_date` (timestamptz)
   - `status` (text: 'active', 'expired', 'cancelled')
   - `payment_status` (text: 'paid', 'pending', 'failed')
+  - `payment_method` (text, nullable) - Payment method: 'stripe', 'cash', 'staff', 'family', 'other', or NULL for legacy records
+  - `stripe_subscription_id` (text, nullable) - Stripe subscription ID for Stripe-paid memberships. NULL for non-Stripe memberships
   - `created_at` (timestamptz)
   - `updated_at` (timestamptz)
 - **RLS**: Users can view own, admins can manage all
+- **Payment Tracking**: 
+  - Stripe memberships: `payment_method = 'stripe'` and `stripe_subscription_id` contains the Stripe subscription ID
+  - Admin-created memberships: `payment_method` set to 'cash', 'staff', 'family', or 'other' (no `stripe_subscription_id`)
+  - Legacy records may have NULL `payment_method` (before migration)
+- **Migration**: Run `ADD_PAYMENT_METHOD_TO_USER_MEMBERSHIPS.sql` to add `payment_method` and `stripe_subscription_id` columns
 
 #### `check_ins`
 - **Purpose**: Gym visit tracking
@@ -492,13 +501,17 @@ Used in `.github/workflows/github-actions-demo.yml`:
 - **Auth**: Requires Bearer token (uses SERVICE_ROLE_KEY)
 - **Returns**: Subscription status and updates `user_memberships` table
 - **Logic**: Creates or updates membership record based on Stripe subscription
+- **Payment Tracking**: Automatically sets `payment_method = 'stripe'` and `stripe_subscription_id` when syncing Stripe subscriptions
 
 ### `cancel-subscription`
-- **Purpose**: Cancel Stripe subscription at period end
+- **Purpose**: Cancel Stripe subscription at period end or cancel non-Stripe memberships
 - **Method**: POST
 - **Auth**: Requires Bearer token (uses SERVICE_ROLE_KEY)
 - **Returns**: Cancellation confirmation
-- **Logic**: Sets `cancel_at_period_end: true` in Stripe, updates status to 'cancelled'
+- **Logic**: 
+  - For Stripe memberships: Sets `cancel_at_period_end: true` in Stripe, updates status to 'cancelled'
+  - For non-Stripe memberships (cash, staff, family, other): Updates status to 'cancelled' in database only
+  - Handles memberships without Stripe subscriptions gracefully (updates database only)
 
 ## 🛣️ Application Routes
 
@@ -758,7 +771,12 @@ Defined in `src/index.css`:
 1. User clicks "Register Membership" → `create-checkout` function
 2. Redirected to Stripe checkout
 3. On success → `check-subscription` syncs with database
+   - Sets `payment_method = 'stripe'` and `stripe_subscription_id` automatically
 4. `has_valid_membership()` RPC checks active membership for check-ins
+5. **Admin-created memberships**: Admins can manually create memberships with `payment_method` set to 'cash', 'staff', 'family', or 'other' (no Stripe subscription)
+6. **Cancellation**: 
+   - Stripe memberships: Cancelled via Stripe API (sets `cancel_at_period_end: true`)
+   - Non-Stripe memberships: Cancelled in database only (updates status to 'cancelled')
 
 ### Check-in/Check-out Flow
 1. User must have valid membership (`has_valid_membership()`)
