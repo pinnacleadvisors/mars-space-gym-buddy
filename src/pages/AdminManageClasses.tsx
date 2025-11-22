@@ -128,6 +128,7 @@ const AdminManageClasses = () => {
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
+  const [sessionEditDialogOpen, setSessionEditDialogOpen] = useState(false);
   const [capacityDialogOpen, setCapacityDialogOpen] = useState(false);
   const [instructorDialogOpen, setInstructorDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
@@ -136,6 +137,9 @@ const AdminManageClasses = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [instructorFilter, setInstructorFilter] = useState<string>("all");
+  const [sessionInstructorFilter, setSessionInstructorFilter] = useState<string>("all");
+  const [sessionClassFilter, setSessionClassFilter] = useState<string>("all");
+  const [sessionCategoryFilter, setSessionCategoryFilter] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<"classes" | "sessions" | "instructors" | "calendar">("classes");
 
   const classForm = useForm<ClassFormData>({
@@ -197,7 +201,7 @@ const AdminManageClasses = () => {
       setSessionsLoading(true);
       const { data, error } = await supabase
         .from("class_sessions")
-        .select("*, classes(name)")
+        .select("*, classes(name, category)")
         .order("start_time", { ascending: false })
         .limit(100); // Limit to recent 100 sessions
 
@@ -304,6 +308,34 @@ const AdminManageClasses = () => {
     });
     return Array.from(cats).sort();
   }, [classes]);
+
+  // Filter sessions for calendar and sessions tab
+  const filteredSessions = useMemo(() => {
+    return sessions.filter((session) => {
+      const matchesInstructor = sessionInstructorFilter === "all" || session.instructor === sessionInstructorFilter;
+      const matchesClass = sessionClassFilter === "all" || session.classes?.name === sessionClassFilter;
+      const matchesCategory = sessionCategoryFilter === "all" || session.classes?.category === sessionCategoryFilter;
+      return matchesInstructor && matchesClass && matchesCategory;
+    });
+  }, [sessions, sessionInstructorFilter, sessionClassFilter, sessionCategoryFilter]);
+
+  // Get unique session instructors
+  const sessionInstructors = useMemo(() => {
+    const unique = Array.from(new Set(sessions.map(s => s.instructor).filter(Boolean)));
+    return unique.sort();
+  }, [sessions]);
+
+  // Get unique session class names
+  const sessionClassNames = useMemo(() => {
+    const unique = Array.from(new Set(sessions.map(s => s.classes?.name).filter(Boolean)));
+    return unique.sort();
+  }, [sessions]);
+
+  // Get unique session categories
+  const sessionCategories = useMemo(() => {
+    const unique = Array.from(new Set(sessions.map(s => s.classes?.category).filter(Boolean)));
+    return unique.sort();
+  }, [sessions]);
 
   const handleClassSubmit = async (data: ClassFormData) => {
     try {
@@ -844,15 +876,85 @@ const AdminManageClasses = () => {
 
         {/* Sessions Tab */}
         <TabsContent value="sessions" className="space-y-4">
+          {/* Filters */}
+          <div className="grid md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <Select value={sessionInstructorFilter} onValueChange={setSessionInstructorFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Instructors" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Instructors</SelectItem>
+                    {sessionInstructors.map((instructor) => (
+                      <SelectItem key={instructor} value={instructor}>
+                        {instructor}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <Select value={sessionClassFilter} onValueChange={setSessionClassFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Classes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Classes</SelectItem>
+                    {sessionClassNames.map((className) => (
+                      <SelectItem key={className} value={className}>
+                        {className}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <Select value={sessionCategoryFilter} onValueChange={setSessionCategoryFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {sessionCategories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setSessionInstructorFilter("all");
+                    setSessionClassFilter("all");
+                    setSessionCategoryFilter("all");
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
             <CardHeader>
-              <CardTitle>Class Sessions</CardTitle>
+              <CardTitle>Class Sessions ({filteredSessions.length})</CardTitle>
               <CardDescription>View and manage class session capacity</CardDescription>
             </CardHeader>
             <CardContent>
               {sessionsLoading ? (
                 <LoadingSpinner size="md" text="Loading sessions..." />
-              ) : sessions.length === 0 ? (
+              ) : filteredSessions.length === 0 ? (
                 <div className="text-center py-12">
                   <p className="text-muted-foreground">No sessions found. Create sessions from classes.</p>
                 </div>
@@ -871,7 +973,7 @@ const AdminManageClasses = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sessions.map((session) => {
+                      {filteredSessions.map((session) => {
                         const capacity = sessionCapacities.get(session.id);
                         return (
                           <TableRow key={session.id}>
@@ -890,17 +992,46 @@ const AdminManageClasses = () => {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setEditingSession(session);
-                                  setCapacityDialogOpen(true);
-                                }}
-                              >
-                                <Edit className="w-4 h-4 mr-2" />
-                                Edit Capacity
-                              </Button>
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingSession(session);
+                                    setCapacityDialogOpen(true);
+                                  }}
+                                >
+                                  <Edit className="w-4 h-4 mr-2" />
+                                  Edit Capacity
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingSession(session);
+                                    setSessionEditDialogOpen(true);
+                                  }}
+                                >
+                                  <Pencil className="w-4 h-4 mr-2" />
+                                  Edit
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={async () => {
+                                    if (confirm(`Are you sure you want to delete the session "${session.name}"? This action cannot be undone.`)) {
+                                      try {
+                                        await handleDeleteSessionFromCalendar(session.id);
+                                      } catch (error) {
+                                        // Error already handled in handler
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -915,6 +1046,76 @@ const AdminManageClasses = () => {
 
         {/* Calendar Tab */}
         <TabsContent value="calendar" className="space-y-4">
+          {/* Filters */}
+          <div className="grid md:grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <Select value={sessionInstructorFilter} onValueChange={setSessionInstructorFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Instructors" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Instructors</SelectItem>
+                    {sessionInstructors.map((instructor) => (
+                      <SelectItem key={instructor} value={instructor}>
+                        {instructor}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <Select value={sessionClassFilter} onValueChange={setSessionClassFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Classes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Classes</SelectItem>
+                    {sessionClassNames.map((className) => (
+                      <SelectItem key={className} value={className}>
+                        {className}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <Select value={sessionCategoryFilter} onValueChange={setSessionCategoryFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {sessionCategories.map((category) => (
+                      <SelectItem key={category} value={category}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="p-4">
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => {
+                    setSessionInstructorFilter("all");
+                    setSessionClassFilter("all");
+                    setSessionCategoryFilter("all");
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
           <Card>
             <CardHeader>
               <CardTitle>Session Calendar</CardTitle>
@@ -922,7 +1123,7 @@ const AdminManageClasses = () => {
             </CardHeader>
             <CardContent>
               <AdminCalendarView
-                sessions={sessions}
+                sessions={filteredSessions}
                 classes={classes}
                 onAddSession={handleAddSessionFromCalendar}
                 onEditSession={handleEditSessionFromCalendar}
@@ -1130,6 +1331,199 @@ const AdminManageClasses = () => {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Session Dialog */}
+      <Dialog open={sessionEditDialogOpen} onOpenChange={(open) => {
+        setSessionEditDialogOpen(open);
+        if (!open) {
+          setEditingSession(null);
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Session</DialogTitle>
+            <DialogDescription>
+              Update session details
+            </DialogDescription>
+          </DialogHeader>
+          {editingSession && (
+            <div className="space-y-4 py-4">
+              <div>
+                <Label>Session Name</Label>
+                <Input
+                  id="edit-session-name"
+                  defaultValue={editingSession.name}
+                  onChange={(e) => {
+                    if (editingSession) {
+                      setEditingSession({ ...editingSession, name: e.target.value });
+                    }
+                  }}
+                />
+              </div>
+              <div>
+                <Label>Instructor</Label>
+                <Input
+                  id="edit-session-instructor"
+                  defaultValue={editingSession.instructor || ""}
+                  onChange={(e) => {
+                    if (editingSession) {
+                      setEditingSession({ ...editingSession, instructor: e.target.value });
+                    }
+                  }}
+                />
+              </div>
+              <div>
+                <Label>Link to Class Template (Optional)</Label>
+                <Select
+                  value={editingSession.class_id || ""}
+                  onValueChange={(value) => {
+                    if (editingSession) {
+                      setEditingSession({ ...editingSession, class_id: value || null });
+                    }
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {classes.map((cls) => (
+                      <SelectItem key={cls.id} value={cls.id}>
+                        {cls.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !editingSession.start_time && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {editingSession.start_time ? format(parseISO(editingSession.start_time), "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={editingSession.start_time ? parseISO(editingSession.start_time) : undefined}
+                      onSelect={(date) => {
+                        if (date && editingSession) {
+                          const currentStart = parseISO(editingSession.start_time);
+                          const newStart = new Date(date);
+                          newStart.setHours(currentStart.getHours(), currentStart.getMinutes(), 0, 0);
+                          const duration = parseISO(editingSession.end_time).getTime() - currentStart.getTime();
+                          const newEnd = new Date(newStart.getTime() + duration);
+                          setEditingSession({
+                            ...editingSession,
+                            start_time: newStart.toISOString(),
+                            end_time: newEnd.toISOString(),
+                          });
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Start Time</Label>
+                  <Input
+                    type="time"
+                    defaultValue={editingSession.start_time ? format(parseISO(editingSession.start_time), "HH:mm") : ""}
+                    onChange={(e) => {
+                      if (editingSession && e.target.value) {
+                        const [hours, minutes] = e.target.value.split(":").map(Number);
+                        const startDate = parseISO(editingSession.start_time);
+                        startDate.setHours(hours, minutes, 0, 0);
+                        const duration = parseISO(editingSession.end_time).getTime() - parseISO(editingSession.start_time).getTime();
+                        const newEnd = new Date(startDate.getTime() + duration);
+                        setEditingSession({
+                          ...editingSession,
+                          start_time: startDate.toISOString(),
+                          end_time: newEnd.toISOString(),
+                        });
+                      }
+                    }}
+                  />
+                </div>
+                <div>
+                  <Label>End Time</Label>
+                  <Input
+                    type="time"
+                    defaultValue={editingSession.end_time ? format(parseISO(editingSession.end_time), "HH:mm") : ""}
+                    onChange={(e) => {
+                      if (editingSession && e.target.value) {
+                        const [hours, minutes] = e.target.value.split(":").map(Number);
+                        const endDate = parseISO(editingSession.end_time);
+                        endDate.setHours(hours, minutes, 0, 0);
+                        setEditingSession({
+                          ...editingSession,
+                          end_time: endDate.toISOString(),
+                        });
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+              <div>
+                <Label>Capacity</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  defaultValue={editingSession.capacity || 20}
+                  onChange={(e) => {
+                    if (editingSession) {
+                      setEditingSession({ ...editingSession, capacity: parseInt(e.target.value) || 20 });
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setSessionEditDialogOpen(false);
+                setEditingSession(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (editingSession) {
+                  try {
+                    await handleEditSessionFromCalendar(editingSession.id, {
+                      name: editingSession.name,
+                      instructor: editingSession.instructor,
+                      start_time: editingSession.start_time,
+                      end_time: editingSession.end_time,
+                      capacity: editingSession.capacity,
+                      class_id: editingSession.class_id,
+                    });
+                    setSessionEditDialogOpen(false);
+                    setEditingSession(null);
+                  } catch (error) {
+                    // Error already handled
+                  }
+                }
+              }}
+            >
+              Update Session
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

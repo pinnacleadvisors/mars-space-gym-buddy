@@ -154,40 +154,50 @@ export const AdminCalendarView = ({
   const handleSaveSession = async () => {
     if (!newSession.name || !newSession.startDate) return;
 
-    const startDateTime = new Date(newSession.startDate);
-    const [startHours, startMinutes] = newSession.startTime.split(":").map(Number);
-    startDateTime.setHours(startHours, startMinutes, 0, 0);
+    try {
+      const startDateTime = new Date(newSession.startDate);
+      const [startHours, startMinutes] = newSession.startTime.split(":").map(Number);
+      startDateTime.setHours(startHours, startMinutes, 0, 0);
 
-    const endDateTime = new Date(newSession.startDate);
-    const [endHours, endMinutes] = newSession.endTime.split(":").map(Number);
-    endDateTime.setHours(endHours, endMinutes, 0, 0);
+      const endDateTime = new Date(newSession.startDate);
+      const [endHours, endMinutes] = newSession.endTime.split(":").map(Number);
+      endDateTime.setHours(endHours, endMinutes, 0, 0);
 
-    const sessionData = {
-      name: newSession.name,
-      instructor: newSession.instructor || null,
-      start_time: startDateTime.toISOString(),
-      end_time: endDateTime.toISOString(),
-      capacity: newSession.capacity,
-      class_id: newSession.class_id || null,
-    };
+      const sessionData = {
+        name: newSession.name,
+        instructor: newSession.instructor || null,
+        start_time: startDateTime.toISOString(),
+        end_time: endDateTime.toISOString(),
+        capacity: newSession.capacity,
+        class_id: newSession.class_id || null,
+      };
 
-    if (editingSession) {
-      await onEditSession?.(editingSession.id, sessionData);
-    } else {
-      await onAddSession?.(sessionData);
+      if (editingSession) {
+        await onEditSession?.(editingSession.id, sessionData);
+      } else {
+        await onAddSession?.(sessionData);
+      }
+
+      setShowAddDialog(false);
+      setShowEditDialog(false);
+      setEditingSession(null);
+    } catch (error) {
+      // Error already handled in parent component
+      console.error("Error saving session:", error);
     }
-
-    setShowAddDialog(false);
-    setShowEditDialog(false);
-    setEditingSession(null);
   };
 
   const handleConfirmDelete = async () => {
-    if (editingSession) {
-      await onDeleteSession?.(editingSession.id);
+    try {
+      if (editingSession) {
+        await onDeleteSession?.(editingSession.id);
+      }
+      setShowDeleteDialog(false);
+      setEditingSession(null);
+    } catch (error) {
+      // Error already handled in parent component
+      console.error("Error deleting session:", error);
     }
-    setShowDeleteDialog(false);
-    setEditingSession(null);
   };
 
   if (viewMode === "day" && selectedDay) {
@@ -255,51 +265,65 @@ export const AdminCalendarView = ({
               ))}
             </div>
 
-            {/* Calendar grid */}
-            <div className="grid grid-cols-7 gap-1">
-              {calendarDays.map((day, index) => {
-                const daySessions = getSessionsForDate(day);
-                const isCurrentMonth = isSameMonth(day, currentMonth);
-                const isToday = isSameDay(day, new Date());
-                const isSelected = selectedDay && isSameDay(day, selectedDay);
-
+            {/* Calendar grid with week separators */}
+            <div className="space-y-0">
+              {Array.from({ length: Math.ceil(calendarDays.length / 7) }, (_, weekIndex) => {
+                const weekStart = weekIndex * 7;
+                const weekDays = calendarDays.slice(weekStart, weekStart + 7);
+                
                 return (
-                  <div
-                    key={index}
-                    className={cn(
-                      "min-h-[100px] border rounded-lg p-2 cursor-pointer transition-colors",
-                      !isCurrentMonth && "opacity-40",
-                      isToday && "border-primary border-2",
-                      isSelected && "bg-primary/10 border-primary",
-                      "hover:bg-accent"
+                  <div key={weekIndex}>
+                    <div className="grid grid-cols-7">
+                      {weekDays.map((day, dayIndex) => {
+                        const daySessions = getSessionsForDate(day);
+                        const isCurrentMonth = isSameMonth(day, currentMonth);
+                        const isToday = isSameDay(day, new Date());
+                        const isSelected = selectedDay && isSameDay(day, selectedDay);
+
+                        return (
+                          <div
+                            key={dayIndex}
+                            className={cn(
+                              "min-h-[100px] p-2 cursor-pointer transition-colors",
+                              !isCurrentMonth && "opacity-40",
+                              isToday && "bg-primary/5",
+                              isSelected && "bg-primary/10",
+                              "hover:bg-accent"
+                            )}
+                            onClick={() => handleDateClick(day)}
+                          >
+                            <div
+                              className={cn(
+                                "text-sm font-semibold mb-1",
+                                isToday && "text-primary",
+                                isSelected && "text-primary"
+                              )}
+                            >
+                              {format(day, "d")}
+                            </div>
+                            <div className="space-y-1">
+                              {daySessions.slice(0, 3).map((session) => (
+                                <Badge
+                                  key={session.id}
+                                  variant="secondary"
+                                  className="w-full text-xs truncate"
+                                >
+                                  {session.name}
+                                </Badge>
+                              ))}
+                              {daySessions.length > 3 && (
+                                <div className="text-xs text-muted-foreground">
+                                  +{daySessions.length - 3} more
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {weekIndex < Math.ceil(calendarDays.length / 7) - 1 && (
+                      <div className="border-t border-border my-0" />
                     )}
-                    onClick={() => handleDateClick(day)}
-                  >
-                    <div
-                      className={cn(
-                        "text-sm font-semibold mb-1",
-                        isToday && "text-primary",
-                        isSelected && "text-primary"
-                      )}
-                    >
-                      {format(day, "d")}
-                    </div>
-                    <div className="space-y-1">
-                      {daySessions.slice(0, 3).map((session) => (
-                        <Badge
-                          key={session.id}
-                          variant="secondary"
-                          className="w-full text-xs truncate"
-                        >
-                          {session.name}
-                        </Badge>
-                      ))}
-                      {daySessions.length > 3 && (
-                        <div className="text-xs text-muted-foreground">
-                          +{daySessions.length - 3} more
-                        </div>
-                      )}
-                    </div>
                   </div>
                 );
               })}

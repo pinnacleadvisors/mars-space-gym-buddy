@@ -145,55 +145,69 @@ export const ClassCalendarView = ({
             ))}
           </div>
 
-          {/* Calendar grid */}
-          <div className="grid grid-cols-7 gap-1">
-            {calendarDays.map((day, index) => {
-              const daySessions = getSessionsForDate(day);
-              const isCurrentMonth = isSameMonth(day, currentMonth);
-              const isToday = isSameDay(day, new Date());
-              const isSelected = selectedDate && isSameDay(day, selectedDate);
-
+          {/* Calendar grid with week separators */}
+          <div className="space-y-0">
+            {Array.from({ length: Math.ceil(calendarDays.length / 7) }, (_, weekIndex) => {
+              const weekStart = weekIndex * 7;
+              const weekDays = calendarDays.slice(weekStart, weekStart + 7);
+              
               return (
-                <div
-                  key={index}
-                  className={cn(
-                    "min-h-[100px] border rounded-lg p-2 cursor-pointer transition-colors",
-                    !isCurrentMonth && "opacity-40",
-                    isToday && "border-primary border-2",
-                    isSelected && "bg-primary/10 border-primary",
-                    "hover:bg-accent"
+                <div key={weekIndex}>
+                  <div className="grid grid-cols-7">
+                    {weekDays.map((day, dayIndex) => {
+                      const daySessions = getSessionsForDate(day);
+                      const isCurrentMonth = isSameMonth(day, currentMonth);
+                      const isToday = isSameDay(day, new Date());
+                      const isSelected = selectedDate && isSameDay(day, selectedDate);
+
+                      return (
+                        <div
+                          key={dayIndex}
+                          className={cn(
+                            "min-h-[100px] p-2 cursor-pointer transition-colors",
+                            !isCurrentMonth && "opacity-40",
+                            isToday && "bg-primary/5",
+                            isSelected && "bg-primary/10",
+                            "hover:bg-accent"
+                          )}
+                          onClick={() => handleDateClick(day)}
+                        >
+                          <div
+                            className={cn(
+                              "text-sm font-semibold mb-1",
+                              isToday && "text-primary",
+                              isSelected && "text-primary"
+                            )}
+                          >
+                            {format(day, "d")}
+                          </div>
+                          <div className="space-y-1">
+                            {daySessions.slice(0, 3).map((session) => (
+                              <Badge
+                                key={session.id}
+                                variant="secondary"
+                                className="w-full text-xs truncate cursor-pointer hover:bg-primary hover:text-primary-foreground"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onSessionClick?.(session);
+                                }}
+                              >
+                                {session.name}
+                              </Badge>
+                            ))}
+                            {daySessions.length > 3 && (
+                              <div className="text-xs text-muted-foreground">
+                                +{daySessions.length - 3} more
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {weekIndex < Math.ceil(calendarDays.length / 7) - 1 && (
+                    <div className="border-t border-border my-0" />
                   )}
-                  onClick={() => handleDateClick(day)}
-                >
-                  <div
-                    className={cn(
-                      "text-sm font-semibold mb-1",
-                      isToday && "text-primary",
-                      isSelected && "text-primary"
-                    )}
-                  >
-                    {format(day, "d")}
-                  </div>
-                  <div className="space-y-1">
-                    {daySessions.slice(0, 3).map((session) => (
-                      <Badge
-                        key={session.id}
-                        variant="secondary"
-                        className="w-full text-xs truncate cursor-pointer hover:bg-primary hover:text-primary-foreground"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSessionClick?.(session);
-                        }}
-                      >
-                        {session.name}
-                      </Badge>
-                    ))}
-                    {daySessions.length > 3 && (
-                      <div className="text-xs text-muted-foreground">
-                        +{daySessions.length - 3} more
-                      </div>
-                    )}
-                  </div>
                 </div>
               );
             })}
