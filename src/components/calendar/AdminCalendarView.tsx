@@ -677,7 +677,7 @@ const DayView = ({
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       onEditSession(session);
-                                    }}fi
+                                    }}
                                   >
                                     <Pencil className="h-4 w-4" />
                                   </Button>
