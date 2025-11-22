@@ -15,6 +15,7 @@ import {
   CreditCard,
   UserCog,
   Trophy,
+  Settings,
 } from "lucide-react";
 import {
   Sidebar,
@@ -83,6 +84,7 @@ export function AppSidebar() {
     { icon: Trophy, label: "Rewards", path: "/rewards" },
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
     { icon: UserCog, label: "Profile", path: "/profile" },
+    { icon: Settings, label: "Settings", path: "/settings" },
   ];
 
   // 🧩 Admin-only menu (added if admin)

@@ -84,6 +84,7 @@ mars-space-gym-buddy/
 │   │   ├── Profile.tsx            # User profile management (✅ fully implemented with profile editing, avatar upload, membership/booking history)
 │   │   ├── EntryExit.tsx          # Combined QR code check-in/check-out
 │   │   ├── Rewards.tsx            # Rewards page (✅ tracks gym hours and classes, displays QR code when goals reached)
+│   │   ├── Settings.tsx           # Settings page (✅ password change, 2FA placeholder, email preferences, account settings)
 │   │   ├── AdminLogin.tsx         # Admin login
 │   │   ├── AdminDashboard.tsx     # Admin dashboard
 │   │   ├── AdminUsers.tsx         # User management (✅ fully implemented with search, filtering, bulk actions, role management, activity history)
@@ -457,6 +458,7 @@ Used in `.github/workflows/github-actions-demo.yml`:
 - `/profile` - User profile management (view/edit profile, membership history, booking history)
 - `/qr/entry-exit` - QR check-in/check-out (requires valid membership + location, toggles between entry and exit based on active check-in status)
 - `/rewards` - Rewards page (tracks gym hours and classes, displays QR code when goals reached)
+- `/settings` - Settings page (change password, 2FA placeholder, email preferences, account settings)
 - `/rewards` - Rewards page (tracks gym hours and classes, displays QR code when goals reached)
 
 **Note**: All authenticated routes are wrapped with `ProtectedRoute` component which:
@@ -995,6 +997,40 @@ The Profile page (`src/pages/Profile.tsx`) includes:
 - **Loading States**: Loading spinner during data fetch
 
 **Note**: The `avatars` storage bucket must be created in Supabase Storage for profile picture uploads to work. The bucket should be public or have appropriate RLS policies.
+
+### Settings Page Features
+The Settings page (`src/pages/Settings.tsx`) includes:
+- **Change Password**:
+  - Requires current password verification
+  - Validates new password strength (8+ chars, uppercase, lowercase, number)
+  - Prevents reusing current password
+  - Password visibility toggles for all fields
+  - Form validation using Zod schemas
+- **Two-Factor Authentication (2FA)**:
+  - Toggle switch for enabling/disabling 2FA
+  - Placeholder implementation with "Coming Soon" message
+  - Ready for future 2FA integration
+- **Email Preferences**:
+  - Email notifications toggle (account and security updates)
+  - Booking reminders toggle
+  - Marketing emails toggle
+  - Save preferences functionality
+- **Account Settings**:
+  - Display current email address (read-only)
+  - Account creation date
+  - Email change requires support contact (placeholder)
+- **Danger Zone**:
+  - Sign out button with logout functionality
+  - Destructive styling for irreversible actions
+- **Security Features**:
+  - Current password verification before allowing password change
+  - Password strength validation
+  - Secure password update via Supabase Auth
+- **User Experience**:
+  - Clear section organization with cards
+  - Loading states for all actions
+  - Toast notifications for success/error feedback
+  - Responsive design for all screen sizes
 
 ### Bookings Page Features
 The Bookings page (`src/pages/Bookings.tsx`) includes:

@@ -26,6 +26,7 @@ import AdminUserMemberships from "./pages/AdminUserMemberships";
 import ManageMemberships from "./pages/ManageMemberships";
 import Profile from "./pages/Profile";
 import Rewards from "./pages/Rewards";
+import Settings from "./pages/Settings";
 import AdminRewardClaim from "./pages/AdminRewardClaim";
 import EmailVerificationRequired from "./pages/EmailVerificationRequired";
 import NotFound from "./pages/NotFound";
@@ -115,6 +116,14 @@ const App = () => {
               element={
                 <ProtectedRoute>
                   <Rewards />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
                 </ProtectedRoute>
               }
             />
