@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, Dumbbell, TrendingUp, Users, QrCode, LogIn, Clock, AlertCircle, CheckCircle2, XCircle, ArrowRight } from "lucide-react";
+import { Calendar, Dumbbell, TrendingUp, Users, QrCode, LogIn, Clock, AlertCircle, CheckCircle2, XCircle, ArrowRight, Trophy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { QRCodeDisplay } from "@/components/qr/QRCodeDisplay";
@@ -13,6 +13,7 @@ import { format, isToday, isThisWeek, differenceInHours, differenceInMinutes } f
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { LoadingSpinner } from "@/components/loading/LoadingSpinner";
+import { Progress } from "@/components/ui/progress";
 
 interface CheckIn {
   id: string;
@@ -52,9 +53,14 @@ const Dashboard = () => {
   const [membership, setMembership] = useState<Membership | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasActiveCheckIn, setHasActiveCheckIn] = useState<boolean>(false);
+  const [totalHours, setTotalHours] = useState<number>(0);
+  const [totalClasses, setTotalClasses] = useState<number>(0);
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const HOURS_TARGET = 15;
+  const CLASSES_TARGET = 15;
 
   const fetchDashboardData = async () => {
     try {
@@ -141,6 +147,26 @@ const Dashboard = () => {
   const totalVisits = checkIns.length;
   const activeBookings = bookings.filter((b) => b.status === "booked").length;
   const classesAttended = bookings.filter((b) => b.status === "attended").length;
+
+  // Calculate rewards progress
+  useEffect(() => {
+    // Calculate total hours from check-ins
+    let hours = 0;
+    checkIns.forEach((checkIn) => {
+      if (checkIn.check_out_time) {
+        const checkInTime = new Date(checkIn.check_in_time).getTime();
+        const checkOutTime = new Date(checkIn.check_out_time).getTime();
+        const durationMs = checkOutTime - checkInTime;
+        const durationHours = durationMs / (1000 * 60 * 60); // Convert to hours
+        hours += durationHours;
+      }
+    });
+    setTotalHours(Math.round(hours * 10) / 10); // Round to 1 decimal place
+
+    // Calculate total classes attended
+    const attendedCount = bookings.filter((b) => b.status === "attended").length;
+    setTotalClasses(attendedCount);
+  }, [checkIns, bookings]);
 
   // Upcoming classes (next 3)
   const upcomingClasses = bookings
@@ -271,6 +297,49 @@ const Dashboard = () => {
             daysRemaining={membershipDaysRemaining}
           />
         </div>
+
+        {/* Rewards Widget */}
+        <Card className="mb-8 cursor-pointer hover:bg-accent/5 transition-colors" onClick={() => navigate("/rewards")}>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <Trophy className="w-5 h-5 text-primary" />
+                Rewards Progress
+              </CardTitle>
+              <ArrowRight className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <CardDescription>Click to view full rewards page</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Hours in Gym Progress */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">Hours in Gym</span>
+                </div>
+                <span className="text-sm font-semibold">
+                  {totalHours.toFixed(1)}/{HOURS_TARGET}
+                </span>
+              </div>
+              <Progress value={Math.min((totalHours / HOURS_TARGET) * 100, 100)} className="h-2" />
+            </div>
+
+            {/* Classes Progress */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Dumbbell className="w-4 h-4 text-secondary" />
+                  <span className="text-sm font-medium">Classes</span>
+                </div>
+                <span className="text-sm font-semibold">
+                  {totalClasses}/{CLASSES_TARGET}
+                </span>
+              </div>
+              <Progress value={Math.min((totalClasses / CLASSES_TARGET) * 100, 100)} className="h-2" />
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Membership Status Widget */}
         {membership && (

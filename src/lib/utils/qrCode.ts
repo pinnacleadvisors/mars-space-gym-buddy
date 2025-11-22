@@ -6,7 +6,7 @@ import QRCode from 'qrcode';
 export interface QRCodeData {
   userId: string;
   timestamp: number;
-  action: 'entry' | 'exit';
+  action: 'entry' | 'exit' | 'reward';
   sessionId?: string; // Optional session ID for unique QR codes
 }
 
@@ -49,7 +49,10 @@ export const decodeQRCodeData = (jsonString: string): QRCodeData | null => {
     const data = JSON.parse(jsonString);
     // Validate the data structure
     if (data.userId && data.timestamp && data.action) {
-      return data as QRCodeData;
+      // Allow entry, exit, or reward actions
+      if (['entry', 'exit', 'reward'].includes(data.action)) {
+        return data as QRCodeData;
+      }
     }
     return null;
   } catch (error) {

@@ -63,6 +63,7 @@ mars-space-gym-buddy/
 │   │       ├── networkErrorHandler.ts # Network error handling utility
 │   │       ├── toastHelpers.ts    # Toast notification helpers
 │   │       ├── qrCode.ts          # QR code generation utilities
+│   │       ├── rewardClaim.ts     # Reward claim utility functions
 │   │       └── pathUtils.ts       # Path utilities for base path handling (GitHub Pages)
 │   ├── lib/
 │   │   └── validations/          # Zod validation schemas
@@ -82,6 +83,7 @@ mars-space-gym-buddy/
 │   │   ├── ManageMemberships.tsx  # Membership management
 │   │   ├── Profile.tsx            # User profile management (✅ fully implemented with profile editing, avatar upload, membership/booking history)
 │   │   ├── EntryExit.tsx          # Combined QR code check-in/check-out
+│   │   ├── Rewards.tsx            # Rewards page (✅ tracks gym hours and classes, displays QR code when goals reached)
 │   │   ├── AdminLogin.tsx         # Admin login
 │   │   ├── AdminDashboard.tsx     # Admin dashboard
 │   │   ├── AdminUsers.tsx         # User management (✅ fully implemented with search, filtering, bulk actions, role management, activity history)
@@ -89,6 +91,7 @@ mars-space-gym-buddy/
 │   │   ├── AdminManageClasses.tsx # Class management (✅ fully implemented with improved UI, bulk creation, capacity management, instructor management)
 │   │   ├── AdminManageMemberships.tsx # Membership management (✅ fully implemented with plan creation/editing, statistics, renewal reminders)
 │   │   ├── AdminUserMemberships.tsx   # User membership management
+│   │   ├── AdminRewardClaim.tsx       # Reward claim scanner (✅ for staff to scan member QR codes)
 │   │   └── NotFound.tsx           # 404 page
 │   └── types/                     # TypeScript type definitions
 │       ├── database.ts            # Database schema types (PRIMARY)
@@ -107,7 +110,8 @@ mars-space-gym-buddy/
 │   │   └── cancel-subscription/   # Subscription cancellation
 │   └── migrations/                # Database migrations (run in Supabase Dashboard SQL Editor)
 │       ├── RESET_DATABASE.sql     # Resets database (drops all tables, functions, types, and policies)
-│       └── COMPLETE_SCHEMA_SETUP.sql # Complete database schema setup from scratch
+│       ├── COMPLETE_SCHEMA_SETUP.sql # Complete database schema setup from scratch
+│       └── ADD_REWARD_CLAIMS.sql  # Adds reward_claims table and claim_reward() function
 ├── scripts/                       # Utility scripts
 │   ├── sync-database-types.sh    # Script to sync database types from GitHub
 │   └── watch-database-types.sh   # Watch script for auto-pulling type updates
@@ -301,6 +305,25 @@ mars-space-gym-buddy/
   - Admins can view/update/delete all check-ins (`has_role(auth.uid(), 'admin')`)
 - **Trigger**: Auto-calculates duration on checkout
 
+#### `reward_claims`
+- **Purpose**: Track reward claims via QR codes
+- **Columns**:
+  - `id` (uuid, PK)
+  - `user_id` (uuid, FK → profiles)
+  - `claimed_at` (timestamptz, default now())
+  - `qr_code_data` (jsonb) - Stores the QR code data that was used
+  - `qr_timestamp` (bigint) - Timestamp from QR code
+  - `qr_session_id` (text) - Session ID from QR code
+  - `reward_type` (text, default 'free_drink', CHECK: 'free_drink' or 'other')
+  - `created_at` (timestamptz)
+- **RLS**: 
+  - Users can view/insert own reward claims (`auth.uid() = user_id`)
+  - Admins can view/insert all reward claims (`has_role(auth.uid(), 'admin')`)
+- **Indexes**: 
+  - `idx_reward_claims_user_id` on `user_id`
+  - `idx_reward_claims_claimed_at` on `claimed_at`
+  - `idx_reward_claims_qr_timestamp_session` on `qr_timestamp, qr_session_id` (prevents duplicate claims)
+
 ### Database Functions
 
 #### `has_role(_user_id uuid, _role app_role) → boolean`
@@ -315,6 +338,16 @@ mars-space-gym-buddy/
 - **Purpose**: Check if user has active paid membership
 - **Security**: SECURITY DEFINER
 - **Logic**: Checks for active status, paid payment, and valid end_date
+
+#### `claim_reward(_user_id uuid, _qr_timestamp bigint, _qr_session_id text, _reward_type text) → jsonb`
+- **Purpose**: Validates and records a reward claim via QR code
+- **Security**: SECURITY DEFINER
+- **Logic**: 
+  - Validates QR code expiration (5 minutes)
+  - Prevents duplicate claims (checks if QR code already used)
+  - Inserts reward claim record
+  - Returns success/error result
+- **Returns**: JSON object with `success`, `message`, `error`, and `claimed_at` fields
 
 #### `update_updated_at_column()`
 - **Purpose**: Trigger function to update `updated_at` timestamp
@@ -423,6 +456,7 @@ Used in `.github/workflows/github-actions-demo.yml`:
 - `/managememberships` - Membership management
 - `/profile` - User profile management (view/edit profile, membership history, booking history)
 - `/qr/entry-exit` - QR check-in/check-out (requires valid membership + location, toggles between entry and exit based on active check-in status)
+- `/rewards` - Rewards page (tracks gym hours and classes, displays QR code when goals reached)
 
 **Note**: All authenticated routes are wrapped with `ProtectedRoute` component which:
 - Checks if user is authenticated
@@ -437,6 +471,7 @@ Used in `.github/workflows/github-actions-demo.yml`:
 - `/admin/manageclasses` - Class management
 - `/admin/memberships` - Membership plan management
 - `/admin/usermemberships` - User membership management
+- `/admin/reward-claim` - Reward claim scanner (for staff to scan member QR codes)
 
 **Note**: All admin routes are wrapped with `AdminRoute` component which:
 - Checks if user is authenticated and has admin role
@@ -1641,7 +1676,7 @@ The application implements comprehensive QR code generation and scanning functio
 interface QRCodeData {
   userId: string;
   timestamp: number;
-  action: 'entry' | 'exit';
+  action: 'entry' | 'exit' | 'reward';
   sessionId?: string; // Optional for unique QR codes
 }
 ```
@@ -1666,11 +1701,12 @@ interface QRCodeData {
 - ✅ Unique QR codes per user with timestamp
 - ✅ Optional session ID for unique QR codes per session
 - ✅ QR code expiration validation (5 minutes default)
-- ✅ Action-specific QR codes (entry vs exit)
+- ✅ Action-specific QR codes (entry, exit, or reward)
 - ✅ Camera-based scanning with html5-qrcode library
 - ✅ Manual entry fallback for QR code data
 - ✅ Download QR codes as PNG images
 - ✅ Refresh to generate new QR codes
+- ✅ Reward QR codes auto-refresh every 5 minutes
 
 **QR Code Usage:**
 ```typescript
@@ -1712,14 +1748,96 @@ const qrImageUrl = await generateQRCodeImage(qrData);
   - Automatically toggles between entry and exit based on check-in status
   - Includes QR scanner for both entry and exit actions
   - Validates location (Grinstead Rd, London SE8 5FE, United Kingdom)
+- ✅ Rewards page (`/rewards`): Displays reward QR code when goals are reached
+- ✅ AdminRewardClaim page (`/admin/reward-claim`): Staff scanner for member reward QR codes
 - ✅ All QR codes are user-specific and time-limited
 
 **QR Code Security:**
 - QR codes include user ID and timestamp
 - QR codes expire after 5 minutes (configurable)
 - QR codes are validated before processing
-- Action type (entry/exit) is validated
+- Action type (entry/exit/reward) is validated
 - Manual entry option for accessibility
+- Reward QR codes prevent duplicate claims via timestamp + session ID validation
+
+### Rewards System
+The application implements a comprehensive rewards system that tracks member progress and allows claiming rewards via QR codes:
+
+**Rewards Page (`src/pages/Rewards.tsx`):**
+- **Progress Tracking**: 
+  - Tracks hours in gym (calculated from `check_ins` table, difference between check-in and check-out times)
+  - Tracks classes attended (counts from `class_bookings` where `status = 'attended'`)
+  - Displays progress bars showing current progress vs targets (15 hours and 15 classes)
+- **Reset Logic**: 
+  - Progress resets after claiming a reward
+  - Only counts check-ins and classes AFTER the last reward claim
+  - Fetches last claim time from `reward_claims` table
+  - Calculates progress from `claimed_at` timestamp onwards
+- **QR Code Display**: 
+  - Shows reward QR code when both goals are reached (15 hours AND 15 classes)
+  - QR code uses 'reward' action type
+  - Auto-refreshes every 5 minutes for security
+  - Unique per generation (userId + timestamp + sessionId)
+- **Dashboard Widget**: 
+  - Displays rewards progress on main dashboard
+  - Shows both progress bars (hours and classes)
+  - Clickable widget that redirects to `/rewards` page
+
+**Reward Claim Utility (`src/lib/utils/rewardClaim.ts`):**
+- `claimReward()`: Validates and processes reward claims via QR codes
+- Validates QR code action type ('reward')
+- Validates QR code belongs to user
+- Calls `claim_reward()` database function
+- Returns success/error result
+
+**Admin Reward Claim Page (`src/pages/AdminRewardClaim.tsx`):**
+- Staff-facing page for scanning member reward QR codes
+- Uses QR code scanner to scan member QR codes
+- Validates QR code expiration and action type
+- Processes reward claim via `claimReward()` utility
+- Shows success/error feedback
+- Protected by `AdminRoute` (admin access required)
+
+**Database Integration:**
+- `reward_claims` table stores all reward claims with:
+  - User ID, claim timestamp, QR code data
+  - QR timestamp and session ID (for duplicate prevention)
+  - Reward type (default: 'free_drink')
+- `claim_reward()` database function:
+  - Validates QR code expiration (5 minutes)
+  - Prevents duplicate claims (checks timestamp + session ID)
+  - Inserts claim record
+  - Returns success/error result
+
+**Rewards System Features:**
+- ✅ Progress tracking for gym hours and classes
+- ✅ Automatic reset after claiming reward
+- ✅ QR code generation when goals reached
+- ✅ 5-minute auto-refresh for QR codes
+- ✅ Duplicate claim prevention
+- ✅ Staff scanning interface
+- ✅ Dashboard widget integration
+- ✅ Secure QR code validation
+
+**Usage Example:**
+```typescript
+import { claimReward } from '@/lib/utils/rewardClaim';
+import { decodeQRCodeData } from '@/lib/utils/qrCode';
+
+// Scan QR code and claim reward
+const qrData = decodeQRCodeData(scannedQRString);
+if (qrData && qrData.action === 'reward') {
+  const result = await claimReward(qrData, 'free_drink');
+  if (result.success) {
+    // Reward claimed successfully
+    // Progress will reset on next page load
+  }
+}
+```
+
+**Migration File:**
+- `supabase/migrations/ADD_REWARD_CLAIMS.sql`: Creates `reward_claims` table and `claim_reward()` function
+- Run this migration in Supabase Dashboard SQL Editor to enable reward claims
 
 ## 📚 Additional Resources
 

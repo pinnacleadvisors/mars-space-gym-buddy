@@ -25,6 +25,8 @@ import AdminManageMemberships from "./pages/AdminManageMemberships";
 import AdminUserMemberships from "./pages/AdminUserMemberships";
 import ManageMemberships from "./pages/ManageMemberships";
 import Profile from "./pages/Profile";
+import Rewards from "./pages/Rewards";
+import AdminRewardClaim from "./pages/AdminRewardClaim";
 import EmailVerificationRequired from "./pages/EmailVerificationRequired";
 import NotFound from "./pages/NotFound";
 
@@ -108,6 +110,14 @@ const App = () => {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/rewards"
+              element={
+                <ProtectedRoute>
+                  <Rewards />
+                </ProtectedRoute>
+              }
+            />
             
             {/* Admin Routes - Require Admin Privileges */}
             <Route
@@ -155,6 +165,14 @@ const App = () => {
               element={
                 <AdminRoute>
                   <AdminUserMemberships />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/reward-claim"
+              element={
+                <AdminRoute>
+                  <AdminRewardClaim />
                 </AdminRoute>
               }
             />
