@@ -177,6 +177,101 @@ export type Database = {
         }
         Relationships: []
       }
+      coupon_codes: {
+        Row: {
+          code: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          type: Database["public"]["Enums"]["coupon_type"]
+          updated_at: string | null
+          usage_limit: number | null
+          valid_from: string | null
+          valid_until: string | null
+          value: number
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          type: Database["public"]["Enums"]["coupon_type"]
+          updated_at?: string | null
+          usage_limit?: number | null
+          valid_from?: string | null
+          valid_until?: string | null
+          value: number
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          type?: Database["public"]["Enums"]["coupon_type"]
+          updated_at?: string | null
+          usage_limit?: number | null
+          valid_from?: string | null
+          valid_until?: string | null
+          value?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_codes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      coupon_usage: {
+        Row: {
+          coupon_id: string
+          created_at: string | null
+          id: string
+          order_id: string | null
+          used_at: string | null
+          user_id: string
+        }
+        Insert: {
+          coupon_id: string
+          created_at?: string | null
+          id?: string
+          order_id?: string | null
+          used_at?: string | null
+          user_id: string
+        }
+        Update: {
+          coupon_id?: string
+          created_at?: string | null
+          id?: string
+          order_id?: string | null
+          used_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coupon_usage_coupon_id_fkey"
+            columns: ["coupon_id"]
+            isOneToOne: false
+            referencedRelation: "coupon_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coupon_usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       memberships: {
         Row: {
           access_level: string | null
@@ -373,6 +468,7 @@ export type Database = {
         }
         Returns: Json
       }
+      get_coupon_usage_count: { Args: { _coupon_id: string }; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -381,9 +477,11 @@ export type Database = {
         Returns: boolean
       }
       has_valid_membership: { Args: { _user_id: string }; Returns: boolean }
+      is_coupon_valid: { Args: { _code: string }; Returns: boolean }
     }
     Enums: {
       app_role: "admin" | "staff" | "member"
+      coupon_type: "percentage" | "money_off"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -512,6 +610,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "staff", "member"],
+      coupon_type: ["percentage", "money_off"],
     },
   },
 } as const
