@@ -388,9 +388,11 @@ export type Database = {
           end_date: string
           id: string
           membership_id: string
+          payment_method: string | null
           payment_status: string | null
           start_date: string
           status: string | null
+          stripe_subscription_id: string | null
           updated_at: string | null
           user_id: string
         }
@@ -399,9 +401,11 @@ export type Database = {
           end_date: string
           id?: string
           membership_id: string
+          payment_method?: string | null
           payment_status?: string | null
           start_date?: string
           status?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string | null
           user_id: string
         }
@@ -410,9 +414,11 @@ export type Database = {
           end_date?: string
           id?: string
           membership_id?: string
+          payment_method?: string | null
           payment_status?: string | null
           start_date?: string
           status?: string | null
+          stripe_subscription_id?: string | null
           updated_at?: string | null
           user_id?: string
         }
