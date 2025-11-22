@@ -205,138 +205,9 @@ export const AdminCalendarView = ({
     }
   };
 
-  if (viewMode === "day" && selectedDay) {
-    const daySessions = getSessionsForDate(selectedDay);
-    return (
-      <DayView
-        date={selectedDay}
-        sessions={daySessions}
-        classes={classes}
-        onBack={() => setViewMode("month")}
-        onDateChange={(date) => {
-          setSelectedDay(date);
-          setCurrentMonth(startOfMonth(date));
-        }}
-        onAddSession={handleAddSession}
-        onEditSession={handleEditSession}
-        onDeleteSession={handleDeleteSession}
-      />
-    );
-  }
-
-  return (
+  // Render dialogs - must be available in both month and day views
+  const renderDialogs = () => (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-2xl font-bold">
-              {format(currentMonth, "MMMM yyyy")}
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handlePreviousMonth}
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={handleNextMonth}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => setCurrentMonth(new Date())}
-              >
-                Today
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {/* Weekday headers */}
-            <div className="grid grid-cols-7 gap-1">
-              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-                <div
-                  key={day}
-                  className="text-center text-sm font-medium text-muted-foreground py-2"
-                >
-                  {day}
-                </div>
-              ))}
-            </div>
-
-            {/* Calendar grid with week separators */}
-            <div className="space-y-0">
-              {Array.from({ length: Math.ceil(calendarDays.length / 7) }, (_, weekIndex) => {
-                const weekStart = weekIndex * 7;
-                const weekDays = calendarDays.slice(weekStart, weekStart + 7);
-                
-                return (
-                  <div key={weekIndex}>
-                    <div className="grid grid-cols-7">
-                      {weekDays.map((day, dayIndex) => {
-                        const daySessions = getSessionsForDate(day);
-                        const isCurrentMonth = isSameMonth(day, currentMonth);
-                        const isToday = isSameDay(day, new Date());
-                        const isSelected = selectedDay && isSameDay(day, selectedDay);
-
-                        return (
-                          <div
-                            key={dayIndex}
-                            className={cn(
-                              "min-h-[100px] p-2 cursor-pointer transition-colors",
-                              !isCurrentMonth && "opacity-40",
-                              isToday && "bg-primary/5",
-                              isSelected && "bg-primary/10",
-                              "hover:bg-accent"
-                            )}
-                            onClick={() => handleDateClick(day)}
-                          >
-                            <div
-                              className={cn(
-                                "text-sm font-semibold mb-1",
-                                isToday && "text-primary",
-                                isSelected && "text-primary"
-                              )}
-                            >
-                              {format(day, "d")}
-                            </div>
-                            <div className="space-y-1">
-                              {daySessions.slice(0, 3).map((session) => (
-                                <Badge
-                                  key={session.id}
-                                  variant="secondary"
-                                  className="w-full text-xs truncate"
-                                >
-                                  {session.name}
-                                </Badge>
-                              ))}
-                              {daySessions.length > 3 && (
-                                <div className="text-xs text-muted-foreground">
-                                  +{daySessions.length - 3} more
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {weekIndex < Math.ceil(calendarDays.length / 7) - 1 && (
-                      <div className="border-t border-border my-0" />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Add/Edit Session Dialog */}
       <Dialog open={showAddDialog || showEditDialog} onOpenChange={(open) => {
         if (!open) {
@@ -485,6 +356,146 @@ export const AdminCalendarView = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </>
+  );
+
+  // Day view
+  if (viewMode === "day" && selectedDay) {
+    const daySessions = getSessionsForDate(selectedDay);
+    return (
+      <>
+        <DayView
+          date={selectedDay}
+          sessions={daySessions}
+          classes={classes}
+          onBack={() => setViewMode("month")}
+          onDateChange={(date) => {
+            setSelectedDay(date);
+            setCurrentMonth(startOfMonth(date));
+          }}
+          onAddSession={handleAddSession}
+          onEditSession={handleEditSession}
+          onDeleteSession={handleDeleteSession}
+        />
+        {renderDialogs()}
+      </>
+    );
+  }
+
+  // Month view
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-2xl font-bold">
+              {format(currentMonth, "MMMM yyyy")}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handlePreviousMonth}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleNextMonth}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setCurrentMonth(new Date())}
+              >
+                Today
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Weekday headers */}
+            <div className="grid grid-cols-7 gap-1">
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                <div
+                  key={day}
+                  className="text-center text-sm font-medium text-muted-foreground py-2"
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* Calendar grid with week separators */}
+            <div className="space-y-0">
+              {Array.from({ length: Math.ceil(calendarDays.length / 7) }, (_, weekIndex) => {
+                const weekStart = weekIndex * 7;
+                const weekDays = calendarDays.slice(weekStart, weekStart + 7);
+                
+                return (
+                  <div key={weekIndex}>
+                    <div className="grid grid-cols-7">
+                      {weekDays.map((day, dayIndex) => {
+                        const daySessions = getSessionsForDate(day);
+                        const isCurrentMonth = isSameMonth(day, currentMonth);
+                        const isToday = isSameDay(day, new Date());
+                        const isSelected = selectedDay && isSameDay(day, selectedDay);
+
+                        return (
+                          <div
+                            key={dayIndex}
+                            className={cn(
+                              "min-h-[100px] p-2 cursor-pointer transition-colors",
+                              !isCurrentMonth && "opacity-40",
+                              isToday && "bg-primary/5",
+                              isSelected && "bg-primary/10",
+                              "hover:bg-accent"
+                            )}
+                            onClick={() => handleDateClick(day)}
+                          >
+                            <div
+                              className={cn(
+                                "text-sm font-semibold mb-1",
+                                isToday && "text-primary",
+                                isSelected && "text-primary"
+                              )}
+                            >
+                              {format(day, "d")}
+                            </div>
+                            <div className="space-y-1">
+                              {daySessions.slice(0, 3).map((session) => (
+                                <Badge
+                                  key={session.id}
+                                  variant="secondary"
+                                  className="w-full text-xs truncate"
+                                >
+                                  {session.name}
+                                </Badge>
+                              ))}
+                              {daySessions.length > 3 && (
+                                <div className="text-xs text-muted-foreground">
+                                  +{daySessions.length - 3} more
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {weekIndex < Math.ceil(calendarDays.length / 7) - 1 && (
+                      <div className="border-t border-border my-0" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+      {renderDialogs()}
     </>
   );
 };
@@ -666,7 +677,7 @@ const DayView = ({
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       onEditSession(session);
-                                    }}
+                                    }}fi
                                   >
                                     <Pencil className="h-4 w-4" />
                                   </Button>
