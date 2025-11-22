@@ -3,6 +3,7 @@ export interface AnalyticsData {
   active_members: number;
   total_visits_today: number;
   total_bookings: number;
+  total_rewards_claimed: number;
   popular_classes: ClassAnalytics[];
   visit_trends: VisitTrend[];
   membership_breakdown: MembershipBreakdown;

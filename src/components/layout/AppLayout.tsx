@@ -36,15 +36,10 @@ export function AppLayout({ children }: AppLayoutProps) {
     <SidebarProvider>
       {showNavigation && <NavigationLoadingIndicator />}
       <div className="relative flex min-h-screen w-full">
-        {showNavigation && (
-        <div className="hidden md:block">
-          <AppSidebar />
-        </div>
-        )}
+        {showNavigation && <AppSidebar />}
         <div className="flex flex-1 flex-col">
           {showNavigation && <TopBar />}
-          <main className={showNavigation ? "flex-1 pb-20 md:pb-4" : "flex-1"}>{children}</main>
-          {showNavigation && <BottomNav />}
+          <main className={showNavigation ? "flex-1" : "flex-1"}>{children}</main>
         </div>
       </div>
     </SidebarProvider>

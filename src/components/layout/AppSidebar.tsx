@@ -1,7 +1,3 @@
-const quickActions = [
-    { icon: QrCode, label: "Entry/Exit", path: "/qr/entry-exit" }
-  ];
-  
 "use client";
 
 import { useEffect, useState } from "react";
@@ -18,6 +14,7 @@ import {
   Dumbbell,
   CreditCard,
   UserCog,
+  Trophy,
 } from "lucide-react";
 import {
   Sidebar,
@@ -28,6 +25,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -37,7 +35,7 @@ import { supabase } from "@/integrations/supabase/client";
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { open, toggleSidebar } = useSidebar();
+  const { open, toggleSidebar, setOpenMobile } = useSidebar();
   const [isAdmin, setIsAdmin] = useState(false);
 
   // 🔐 Check user role from user_roles table
@@ -72,11 +70,17 @@ export function AppSidebar() {
 
   const isActive = (path: string) => location.pathname === path;
 
+  // Quick Actions
+  const quickActions = [
+    { icon: QrCode, label: "Entry/Exit", path: "/qr/entry-exit" }
+  ];
+
   // 🧭 Always visible (member) menu
   const mainNavItems = [
     { icon: Calendar, label: "Classes", path: "/classes" },
     { icon: BookOpen, label: "Bookings", path: "/bookings" },
     { icon: CreditCard, label: "Membership", path: "/managememberships" },
+    { icon: Trophy, label: "Rewards", path: "/rewards" },
     { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
     { icon: UserCog, label: "Profile", path: "/profile" },
   ];
@@ -102,11 +106,12 @@ export function AppSidebar() {
               marsspace
             </h2>
           )}
+          {/* Desktop toggle button */}
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleSidebar}
-            className="ml-auto"
+            className="ml-auto hidden md:flex"
           >
             {open ? (
               <ChevronLeft className="h-4 w-4" />
@@ -127,7 +132,13 @@ export function AppSidebar() {
                 return (
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton
-                      onClick={() => navigate(item.path)}
+                      onClick={() => {
+                        navigate(item.path);
+                        // Close sidebar on mobile after navigation
+                        if (window.innerWidth < 768) {
+                          setOpenMobile(false);
+                        }
+                      }}
                       className={cn(
                         "transition-colors",
                         active && "bg-primary/10 text-primary font-medium"
@@ -156,7 +167,13 @@ export function AppSidebar() {
                   return (
                     <SidebarMenuItem key={item.path}>
                       <SidebarMenuButton
-                        onClick={() => navigate(item.path)}
+                        onClick={() => {
+                          navigate(item.path);
+                          // Close sidebar on mobile after navigation
+                          if (window.innerWidth < 768) {
+                            setOpenMobile(false);
+                          }
+                        }}
                         className={cn(
                           "transition-colors",
                           active && "bg-primary/10 text-primary font-medium"
@@ -185,7 +202,13 @@ export function AppSidebar() {
                 return (
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton
-                      onClick={() => navigate(item.path)}
+                      onClick={() => {
+                        navigate(item.path);
+                        // Close sidebar on mobile after navigation
+                        if (window.innerWidth < 768) {
+                          setOpenMobile(false);
+                        }
+                      }}
                       className={cn(
                         "transition-colors",
                         active && "bg-primary/10 text-primary font-medium"

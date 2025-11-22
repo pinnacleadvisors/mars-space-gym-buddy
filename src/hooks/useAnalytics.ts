@@ -475,6 +475,23 @@ export const useAnalytics = (filters?: AnalyticsFilters) => {
   }, []);
 
   /**
+   * Fetch total rewards claimed
+   */
+  const fetchRewardsClaimed = useCallback(async (): Promise<number> => {
+    try {
+      const { count, error } = await supabase
+        .from('reward_claims')
+        .select('*', { count: 'exact', head: true });
+
+      if (error) throw error;
+      return count || 0;
+    } catch (err: any) {
+      console.error('Error fetching rewards claimed:', err);
+      return 0;
+    }
+  }, []);
+
+  /**
    * Fetch all analytics data
    */
   const fetchAnalytics = useCallback(async () => {
@@ -491,6 +508,7 @@ export const useAnalytics = (filters?: AnalyticsFilters) => {
         classPopularity,
         membershipBreakdown,
         revenue,
+        rewardsClaimed,
       ] = await Promise.all([
         fetchMemberGrowth(),
         fetchClassAttendance(),
@@ -499,6 +517,7 @@ export const useAnalytics = (filters?: AnalyticsFilters) => {
         fetchClassPopularity(),
         fetchMembershipBreakdown(),
         fetchRevenueData(),
+        fetchRewardsClaimed(),
       ]);
 
       // Get total visits today
@@ -528,6 +547,7 @@ export const useAnalytics = (filters?: AnalyticsFilters) => {
         active_members: memberGrowth.activeMembers,
         total_visits_today: visitsToday || 0,
         total_bookings: totalBookings || 0,
+        total_rewards_claimed: rewardsClaimed,
         popular_classes: classPopularity,
         visit_trends: visitTrends,
         membership_breakdown: membershipBreakdown,
@@ -551,6 +571,7 @@ export const useAnalytics = (filters?: AnalyticsFilters) => {
     fetchClassPopularity,
     fetchMembershipBreakdown,
     fetchRevenueData,
+    fetchRewardsClaimed,
   ]);
 
   useEffect(() => {

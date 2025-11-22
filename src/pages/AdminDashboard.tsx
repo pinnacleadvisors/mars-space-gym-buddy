@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Calendar, TrendingUp, DollarSign, RefreshCw, Loader2 } from "lucide-react";
+import { Users, Calendar, TrendingUp, DollarSign, Gift, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAnalytics } from "@/hooks/useAnalytics";
 import { supabase } from "@/integrations/supabase/client";
@@ -83,7 +83,7 @@ const AdminDashboard = () => {
           </Button>
         </div>
         
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
           <AdminStatCard
             title="Total Members"
             value={data?.total_members?.toString() || "0"}
@@ -107,6 +107,12 @@ const AdminDashboard = () => {
             value={data?.total_visits_today?.toString() || "0"}
             icon={<TrendingUp className="w-5 h-5 text-accent" />}
             trend="Check-ins today"
+          />
+          <AdminStatCard
+            title="Rewards Claimed"
+            value={data?.total_rewards_claimed?.toString() || "0"}
+            icon={<Gift className="w-5 h-5 text-primary" />}
+            trend="Total claimed"
           />
         </div>
 

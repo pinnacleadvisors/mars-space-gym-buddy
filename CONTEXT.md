@@ -15,8 +15,8 @@ mars-space-gym-buddy/
 │   ├── components/
 │   │   ├── layout/                # Layout components
 │   │   │   ├── AppLayout.tsx      # Main app layout wrapper (conditionally shows navigation for authenticated users)
-│   │   │   ├── AppSidebar.tsx     # Sidebar navigation (desktop only, shows for authenticated users)
-│   │   │   ├── BottomNav.tsx      # Mobile bottom navigation (4-item fixed grid, context-aware for admin routes)
+│   │   │   ├── AppSidebar.tsx     # Sidebar navigation (desktop: fixed sidebar, mobile: slide-out drawer)
+│   │   │   ├── BottomNav.tsx      # Mobile bottom navigation (deprecated, replaced by mobile sidebar)
 │   │   │   └── TopBar.tsx         # Top navigation bar (shows for authenticated users)
 │   │   └── ui/                    # shadcn/ui components (40+ components)
 │   ├── components/
@@ -457,6 +457,7 @@ Used in `.github/workflows/github-actions-demo.yml`:
 - `/profile` - User profile management (view/edit profile, membership history, booking history)
 - `/qr/entry-exit` - QR check-in/check-out (requires valid membership + location, toggles between entry and exit based on active check-in status)
 - `/rewards` - Rewards page (tracks gym hours and classes, displays QR code when goals reached)
+- `/rewards` - Rewards page (tracks gym hours and classes, displays QR code when goals reached)
 
 **Note**: All authenticated routes are wrapped with `ProtectedRoute` component which:
 - Checks if user is authenticated
@@ -471,6 +472,7 @@ Used in `.github/workflows/github-actions-demo.yml`:
 - `/admin/manageclasses` - Class management
 - `/admin/memberships` - Membership plan management
 - `/admin/usermemberships` - User membership management
+- `/admin/reward-claim` - Reward claim scanner (for staff to scan member QR codes)
 - `/admin/reward-claim` - Reward claim scanner (for staff to scan member QR codes)
 
 **Note**: All admin routes are wrapped with `AdminRoute` component which:
@@ -520,10 +522,21 @@ Defined in `src/index.css`:
 - **Utilities**: `pathUtils.ts` provides `getFullPath()` and `getFullRedirectUrl()` for external redirects (Supabase emailRedirectTo, OAuth, etc.)
 
 ### Layout & Navigation Configuration
-- **AppLayout**: Conditionally renders navigation (TopBar, BottomNav, Sidebar) only for authenticated users on protected routes
+- **AppLayout**: Conditionally renders navigation (TopBar, Sidebar) only for authenticated users on protected routes
 - **Public Routes**: Landing, Login, Register, ForgotPassword, and ResetPassword pages render without navigation
 - **Protected Routes**: Navigation is shown automatically when user is authenticated
-- **BottomNav**: Fixed 4-item grid layout for mobile, shows context-aware items (base nav items for regular users, admin nav items when on admin routes)
+- **Sidebar**: 
+  - Desktop: Fixed sidebar on the left with collapsible icon mode
+  - Mobile: Slide-out drawer (Sheet component) accessible via trigger button in TopBar
+  - Auto-closes on mobile after navigation
+  - Shows main menu items (Classes, Bookings, Membership, Rewards, Dashboard, Profile)
+  - Shows admin menu items when user is admin
+  - Shows quick actions (Entry/Exit QR)
+  - Responsive design with mobile-optimized layout
+- **TopBar**: 
+  - Contains sidebar trigger button for mobile
+  - Shows "Book Class" button and user avatar menu
+  - Sticky header with backdrop blur
 - **Image Paths**: Use `import.meta.env.BASE_URL` for public folder assets to handle GitHub Pages base path correctly
 
 ### `tsconfig.json`
@@ -1136,6 +1149,7 @@ The `useAnalytics` hook (`src/hooks/useAnalytics.ts`) provides comprehensive ana
 - **Class popularity metrics**: Most booked classes with attendance rates and categories
 - **Revenue metrics**: Monthly revenue breakdown with new members and renewals
 - **Membership breakdown**: Active, inactive, and cancelled memberships
+- **Rewards claimed**: Total number of rewards claimed by all members
 - **Date range filtering**: Supports custom date ranges (defaults to last 30 days)
 - **Data aggregation**: Efficient queries with parallel fetching for optimal performance
 - **Usage example**:
@@ -1151,7 +1165,7 @@ The `useAnalytics` hook (`src/hooks/useAnalytics.ts`) provides comprehensive ana
     });
     
     // data contains: total_members, active_members, total_visits_today,
-    // total_bookings, popular_classes, visit_trends, membership_breakdown
+    // total_bookings, total_rewards_claimed, popular_classes, visit_trends, membership_breakdown
     // revenueData contains: period, revenue, new_members, renewals
     // memberGrowth contains: totalMembers, activeMembers, growthThisMonth, growthPercentage
   };
@@ -1159,7 +1173,7 @@ The `useAnalytics` hook (`src/hooks/useAnalytics.ts`) provides comprehensive ana
 
 ### Admin Analytics Page Features
 The AdminAnalytics page (`src/pages/AdminAnalytics.tsx`) includes:
-- **Real-time metrics**: Total members, member growth, class attendance, visits today
+- **Real-time metrics**: Total members, member growth, class attendance, visits today, rewards claimed
 - **Visit trends chart**: Area chart showing daily visits and unique visitors over time (Recharts)
 - **Class popularity chart**: Bar chart showing most booked classes (Recharts)
 - **Revenue trends chart**: Line chart showing monthly revenue and new members (Recharts)

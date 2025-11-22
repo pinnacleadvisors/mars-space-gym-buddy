@@ -6,7 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChartSkeletons } from "@/components/loading/ChartSkeleton";
-import { TrendingUp, Users, Calendar as CalendarIcon, RefreshCw, Download, Loader2 } from "lucide-react";
+import { TrendingUp, Users, Calendar as CalendarIcon, RefreshCw, Download, Loader2, Gift } from "lucide-react";
 import { format, subDays, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { useAnalytics, DateRange } from "@/hooks/useAnalytics";
@@ -310,8 +310,8 @@ const AdminAnalytics = () => {
         {loading ? (
           <>
             {/* Metric Cards Skeletons */}
-            <div className="grid lg:grid-cols-4 gap-6 mb-8">
-              {[1, 2, 3, 4].map((i) => (
+            <div className="grid lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
+              {[1, 2, 3, 4, 5].map((i) => (
                 <Card key={i}>
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between mb-2">
@@ -330,7 +330,7 @@ const AdminAnalytics = () => {
         ) : (
           <>
             {/* Metric Cards */}
-            <div className="grid lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
               <MetricCard
                 title="Total Members"
                 value={data?.total_members?.toString() || "0"}
@@ -357,6 +357,13 @@ const AdminAnalytics = () => {
                 value={data?.total_visits_today?.toString() || "0"}
                 description="Total check-ins today"
                 icon={<TrendingUp className="w-5 h-5 text-accent" />}
+                loading={false}
+              />
+              <MetricCard
+                title="Rewards Claimed"
+                value={data?.total_rewards_claimed?.toString() || "0"}
+                description="Total rewards claimed"
+                icon={<Gift className="w-5 h-5 text-primary" />}
                 loading={false}
               />
             </div>
