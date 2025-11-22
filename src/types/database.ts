@@ -246,6 +246,47 @@ export type Database = {
         }
         Relationships: []
       }
+      reward_claims: {
+        Row: {
+          claimed_at: string
+          created_at: string | null
+          id: string
+          qr_code_data: Json | null
+          qr_session_id: string | null
+          qr_timestamp: number | null
+          reward_type: string | null
+          user_id: string
+        }
+        Insert: {
+          claimed_at?: string
+          created_at?: string | null
+          id?: string
+          qr_code_data?: Json | null
+          qr_session_id?: string | null
+          qr_timestamp?: number | null
+          reward_type?: string | null
+          user_id: string
+        }
+        Update: {
+          claimed_at?: string
+          created_at?: string | null
+          id?: string
+          qr_code_data?: Json | null
+          qr_session_id?: string | null
+          qr_timestamp?: number | null
+          reward_type?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reward_claims_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_memberships: {
         Row: {
           created_at: string | null
@@ -323,6 +364,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_reward: {
+        Args: {
+          _qr_session_id: string
+          _qr_timestamp: number
+          _reward_type?: string
+          _user_id: string
+        }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
