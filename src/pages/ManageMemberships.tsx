@@ -170,25 +170,150 @@ export default function ManageMemberships() {
       if (!session) throw new Error("Not authenticated");
 
       // Cancel subscription via Stripe
-      const { data, error } = await supabase.functions.invoke("cancel-subscription", {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
+      let responseData: any = null;
+      let responseError: any = null;
+      let rawResponseText: string | null = null;
+      
+      try {
+        const response = await supabase.functions.invoke("cancel-subscription", {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        
+        responseData = response.data;
+        responseError = response.error;
+      } catch (err: any) {
+        console.error("Cancel subscription exception:", err);
+        responseError = err;
+        
+        // Try to read the raw response if available
+        if (err.context instanceof Response) {
+          try {
+            const clonedResponse = err.context.clone();
+            rawResponseText = await clonedResponse.text();
+            console.log("Raw error response text:", rawResponseText);
+          } catch (readError) {
+            console.error("Could not read error response:", readError);
+          }
+        }
+      }
+
+      // Log full response for debugging
+      console.log("Cancel subscription response:", {
+        data: responseData,
+        error: responseError,
+        hasData: !!responseData,
+        hasError: !!responseError
       });
 
-      if (error) throw error;
+      if (responseError) {
+        console.error("Cancel subscription error:", responseError);
+        console.error("Error details:", {
+          message: responseError.message,
+          context: responseError.context,
+          status: responseError.status,
+          statusText: responseError.statusText,
+          fullError: JSON.stringify(responseError, Object.getOwnPropertyNames(responseError))
+        });
+        
+        // Try to extract error message from various possible locations
+        let errorMessage = "Failed to cancel membership";
+        
+        // Use raw response text if we already read it
+        if (rawResponseText) {
+          try {
+            const errorBody = JSON.parse(rawResponseText);
+            errorMessage = errorBody.error || 
+                         errorBody.errorDetails?.error || 
+                         errorBody.message || 
+                         errorMessage;
+            console.log("Parsed error body from raw text:", errorBody);
+          } catch {
+            errorMessage = rawResponseText || errorMessage;
+          }
+        }
+        // Check if error.context is a Response object and read its body
+        else if (responseError.context instanceof Response) {
+          try {
+            // Clone the response so we can read it multiple times
+            const clonedResponse = responseError.context.clone();
+            const responseText = await clonedResponse.text();
+            console.log("Response body text:", responseText);
+            
+            if (responseText) {
+              try {
+                const errorBody = JSON.parse(responseText);
+                errorMessage = errorBody.error || 
+                             errorBody.errorDetails?.error || 
+                             errorBody.message || 
+                             errorMessage;
+                console.log("Parsed error body:", errorBody);
+              } catch {
+                // If parsing fails, use the text directly
+                errorMessage = responseText || errorMessage;
+              }
+            }
+          } catch (bodyError) {
+            console.error("Error reading response body:", bodyError);
+          }
+        }
+        
+        // Check if error has a context with body (Edge Function error response)
+        if (responseError.context?.body && typeof responseError.context.body !== 'object') {
+          try {
+            const errorBody = typeof responseError.context.body === 'string' 
+              ? JSON.parse(responseError.context.body) 
+              : responseError.context.body;
+            errorMessage = errorBody.error || errorBody.errorDetails?.error || errorBody.message || errorMessage;
+          } catch {
+            // If parsing fails, use the string directly
+            errorMessage = responseError.context.body || errorMessage;
+          }
+        }
+        
+        // Check error.context.msg
+        if (responseError.context?.msg && !errorMessage.includes("Failed to cancel")) {
+          errorMessage = responseError.context.msg;
+        }
+        
+        // Check error.message (but ignore generic messages)
+        if (responseError.message && 
+            responseError.message !== "Edge Function returned a non-2xx status code" &&
+            responseError.message !== "Unknown error") {
+          errorMessage = responseError.message;
+        }
+        
+        // Check data.error (sometimes error is in data even when error object exists)
+        if (responseData?.error) {
+          errorMessage = responseData.error || responseData.errorDetails?.error || errorMessage;
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      // Check if response contains an error (even if no error object)
+      if (responseData?.error) {
+        console.error("Cancel subscription response error:", responseData);
+        throw new Error(responseData.error || responseData.message || "Failed to cancel membership");
+      }
 
       toast({
         title: "Membership Cancelled",
-        description: data?.message || "Your membership will be cancelled at the end of the billing period.",
+        description: responseData?.message || "Your membership has been cancelled successfully.",
       });
 
       await fetchData();
     } catch (error: any) {
+      console.error("Error cancelling membership:", error);
+      const errorMessage = error?.message || 
+                          error?.error || 
+                          "An unexpected error occurred. Please try again or contact support.";
+      
       toast({
         variant: "destructive",
         title: "Cancellation failed",
-        description: error.message,
+        description: errorMessage,
       });
     } finally {
       setActionLoading(false);

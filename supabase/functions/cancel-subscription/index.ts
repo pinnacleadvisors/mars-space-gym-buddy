@@ -24,14 +24,34 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    logStep("CRITICAL: Missing environment variables", {
+      hasUrl: !!supabaseUrl,
+      hasServiceKey: !!supabaseServiceKey
+    });
+    return new Response(JSON.stringify({ 
+      error: "Server configuration error",
+      success: false
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
+  }
+
   const supabaseClient = createClient(
-    Deno.env.get("SUPABASE_URL") ?? "",
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+    supabaseUrl,
+    supabaseServiceKey,
     { auth: { persistSession: false } }
   );
 
   try {
-    logStep("Function started");
+    logStep("Function started", {
+      hasSupabaseUrl: !!supabaseUrl,
+      hasServiceKey: !!supabaseServiceKey
+    });
 
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) throw new Error("No authorization header provided");
@@ -65,19 +85,41 @@ serve(async (req) => {
     }
 
     // Check if this is a Stripe membership
-    const paymentMethod = userMembership.payment_method?.trim() || null;
+    const paymentMethod = userMembership.payment_method?.trim()?.toLowerCase() || null;
     const stripeSubscriptionId = userMembership.stripe_subscription_id;
+    
+    // Explicitly check if it's a Stripe membership
+    const hasStripePaymentMethod = paymentMethod === 'stripe';
+    const hasStripeSubscriptionId = stripeSubscriptionId !== null && 
+                                     stripeSubscriptionId !== undefined && 
+                                     stripeSubscriptionId !== '' &&
+                                     stripeSubscriptionId !== 'null';
+    
+    // CRITICAL: If payment_method is explicitly set to a non-Stripe value, it's NEVER Stripe
+    // This prevents the function from treating staff/family/cash memberships as Stripe
+    // even if the user's email exists in Stripe from previous transactions
+    // The payment_method column is the source of truth for how the membership was paid
+    const isStripeMembership = paymentMethod && paymentMethod !== 'stripe' 
+      ? false  // Explicitly non-Stripe payment method (staff, family, cash, other)
+      : (hasStripePaymentMethod || hasStripeSubscriptionId);
     
     logStep("Checking membership type", {
       paymentMethod,
       stripeSubscriptionId,
       membershipId: userMembership.id,
       userId: user.id,
-      rawPaymentMethod: userMembership.payment_method
+      rawPaymentMethod: userMembership.payment_method,
+      hasStripePaymentMethod,
+      hasStripeSubscriptionId,
+      isStripeMembership,
+      stripeSubscriptionIdType: typeof stripeSubscriptionId,
+      stripeSubscriptionIdIsNull: stripeSubscriptionId === null,
+      stripeSubscriptionIdIsUndefined: stripeSubscriptionId === undefined,
+      stripeSubscriptionIdValue: String(stripeSubscriptionId),
+      reason: paymentMethod && paymentMethod !== 'stripe' 
+        ? 'payment_method is explicitly non-Stripe' 
+        : (hasStripePaymentMethod ? 'payment_method is stripe' : (hasStripeSubscriptionId ? 'has stripe_subscription_id' : 'no Stripe indicators'))
     });
-    
-    const isStripeMembership = paymentMethod === 'stripe' || 
-                                (stripeSubscriptionId !== null && stripeSubscriptionId !== undefined && stripeSubscriptionId !== '');
 
     if (!isStripeMembership) {
       // Non-Stripe membership - just update database status
@@ -88,14 +130,31 @@ serve(async (req) => {
       });
       
       try {
+        logStep("Attempting to update membership", {
+          membershipId: userMembership.id,
+          currentStatus: userMembership.status,
+          userId: user.id
+        });
+
+        const updatePayload = {
+          status: "cancelled",
+          updated_at: new Date().toISOString()
+        };
+
+        logStep("Update payload", { updatePayload });
+
         const { data: updateData, error: updateError } = await supabaseClient
           .from("user_memberships")
-          .update({
-            status: "cancelled",
-            updated_at: new Date().toISOString()
-          })
+          .update(updatePayload)
           .eq("id", userMembership.id)
           .select();
+
+        logStep("Update query completed", {
+          hasData: !!updateData,
+          dataLength: updateData?.length || 0,
+          hasError: !!updateError,
+          membershipId: userMembership.id
+        });
 
         if (updateError) {
           logStep("Error updating membership status", { 
@@ -104,21 +163,25 @@ serve(async (req) => {
             errorMessage: updateError.message,
             errorDetails: updateError.details,
             errorHint: updateError.hint,
-            membershipId: userMembership.id
+            membershipId: userMembership.id,
+            userId: user.id,
+            fullError: JSON.stringify(updateError, Object.getOwnPropertyNames(updateError))
           });
           throw new Error(`Failed to update membership: ${updateError.message || JSON.stringify(updateError)}`);
         }
 
         if (!updateData || updateData.length === 0) {
-          logStep("Warning: No rows updated", { 
+          logStep("Warning: No rows updated - membership may already be cancelled", { 
             membershipId: userMembership.id,
-            userId: user.id
+            userId: user.id,
+            currentStatus: userMembership.status
           });
           // Still return success as the membership might have already been cancelled
         } else {
           logStep("Membership cancelled successfully", { 
             membershipId: userMembership.id,
-            updatedStatus: updateData[0].status
+            updatedStatus: updateData[0].status,
+            previousStatus: userMembership.status
           });
         }
 
@@ -131,15 +194,25 @@ serve(async (req) => {
         });
       } catch (updateErr) {
         const updateErrorMessage = updateErr instanceof Error ? updateErr.message : String(updateErr);
+        const updateErrorStack = updateErr instanceof Error ? updateErr.stack : undefined;
         logStep("Exception during membership update", { 
           error: updateErrorMessage,
-          membershipId: userMembership.id
+          stack: updateErrorStack,
+          errorType: updateErr?.constructor?.name || typeof updateErr,
+          membershipId: userMembership.id,
+          userId: user.id
         });
         throw updateErr;
       }
     }
 
     // Stripe membership - cancel via Stripe
+    logStep("Processing Stripe membership cancellation", {
+      paymentMethod,
+      stripeSubscriptionId,
+      membershipId: userMembership.id
+    });
+    
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { 
       apiVersion: "2025-08-27.basil" 
     });
@@ -262,11 +335,37 @@ serve(async (req) => {
       status: 200,
     });
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    const errorStack = error instanceof Error ? error.stack : undefined;
+    let errorMessage = "Unknown error";
+    let errorDetails: any = {};
+    
+    try {
+      if (error instanceof Error) {
+        errorMessage = error.message;
+        errorDetails = {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        };
+      } else if (typeof error === 'object' && error !== null) {
+        // Try to extract error information from Supabase error objects
+        errorMessage = (error as any).message || String(error);
+        errorDetails = {
+          code: (error as any).code,
+          message: (error as any).message,
+          details: (error as any).details,
+          hint: (error as any).hint
+        };
+      } else {
+        errorMessage = String(error);
+      }
+    } catch (parseError) {
+      errorMessage = "Error parsing error object";
+      logStep("CRITICAL: Failed to parse error", { parseError, originalError: error });
+    }
+    
     logStep("ERROR in cancel-subscription", { 
       message: errorMessage,
-      stack: errorStack,
+      details: errorDetails,
       errorType: error?.constructor?.name || typeof error
     });
     
@@ -274,6 +373,7 @@ serve(async (req) => {
     try {
       return new Response(JSON.stringify({ 
         error: errorMessage,
+        errorDetails: errorDetails,
         success: false
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -281,8 +381,11 @@ serve(async (req) => {
       });
     } catch (responseError) {
       // Fallback if JSON.stringify fails
-      logStep("CRITICAL: Failed to create error response", { responseError });
-      return new Response("Internal Server Error", {
+      logStep("CRITICAL: Failed to create error response", { 
+        responseError,
+        originalError: errorMessage
+      });
+      return new Response(`Internal Server Error: ${errorMessage}`, {
         headers: corsHeaders,
         status: 500,
       });
