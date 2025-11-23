@@ -509,9 +509,19 @@ Used in `.github/workflows/github-actions-demo.yml`:
 - **Auth**: Requires Bearer token (uses SERVICE_ROLE_KEY)
 - **Returns**: Cancellation confirmation
 - **Logic**: 
-  - For Stripe memberships: Sets `cancel_at_period_end: true` in Stripe, updates status to 'cancelled'
-  - For non-Stripe memberships (cash, staff, family, other): Updates status to 'cancelled' in database only
-  - Handles memberships without Stripe subscriptions gracefully (updates database only)
+  - **Membership Type Detection**: 
+    - Checks `payment_method` column first - if explicitly set to non-Stripe value (staff, family, cash, other), treats as non-Stripe regardless of Stripe customer status
+    - Only treats as Stripe if `payment_method = 'stripe'` OR `stripe_subscription_id` is present
+    - Prevents non-Stripe memberships from entering Stripe cancellation path even if user's email exists in Stripe
+  - **For Stripe memberships**: 
+    - Sets `cancel_at_period_end: true` in Stripe
+    - Updates status to 'cancelled' in database
+    - Handles cases where Stripe customer exists but no active subscription (updates database only)
+  - **For non-Stripe memberships** (cash, staff, family, other): 
+    - Updates status to 'cancelled' in database only
+    - Skips all Stripe API calls
+    - Returns success immediately after database update
+  - **Error Handling**: Comprehensive logging and error messages for debugging
 
 ## 🛣️ Application Routes
 
@@ -775,8 +785,9 @@ Defined in `src/index.css`:
 4. `has_valid_membership()` RPC checks active membership for check-ins
 5. **Admin-created memberships**: Admins can manually create memberships with `payment_method` set to 'cash', 'staff', 'family', or 'other' (no Stripe subscription)
 6. **Cancellation**: 
-   - Stripe memberships: Cancelled via Stripe API (sets `cancel_at_period_end: true`)
-   - Non-Stripe memberships: Cancelled in database only (updates status to 'cancelled')
+   - **Stripe memberships**: Cancelled via Stripe API (sets `cancel_at_period_end: true`), then updates database status to 'cancelled'
+   - **Non-Stripe memberships**: Cancelled in database only (updates status to 'cancelled')
+   - **Membership Type Detection**: The `cancel-subscription` function uses `payment_method` as the source of truth - if `payment_method` is explicitly set to a non-Stripe value (staff, family, cash, other), it will never attempt Stripe cancellation, even if the user's email exists in Stripe from previous transactions
 
 ### Check-in/Check-out Flow
 1. User must have valid membership (`has_valid_membership()`)

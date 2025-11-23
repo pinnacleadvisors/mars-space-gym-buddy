@@ -38,6 +38,7 @@ interface UserMembership {
   end_date: string;
   status: string;
   payment_status: string;
+  payment_method: string | null;
   profiles?: {
     full_name: string | null;
   };
@@ -73,6 +74,7 @@ const AdminUserMemberships = () => {
     end_date: "",
     status: "active",
     payment_status: "paid",
+    payment_method: "",
   });
 
   useEffect(() => {
@@ -116,6 +118,7 @@ const AdminUserMemberships = () => {
       end_date: "",
       status: "active",
       payment_status: "paid",
+      payment_method: "",
     });
     setEditingUserMembership(null);
   };
@@ -141,6 +144,7 @@ const AdminUserMemberships = () => {
         end_date: formData.end_date,
         status: formData.status,
         payment_status: formData.payment_status,
+        payment_method: formData.payment_method || null,
       };
 
       if (editingUserMembership) {
@@ -189,6 +193,7 @@ const AdminUserMemberships = () => {
       end_date: userMembership.end_date.split('T')[0],
       status: userMembership.status,
       payment_status: userMembership.payment_status,
+      payment_method: userMembership.payment_method || "",
     });
     setDialogOpen(true);
   };
@@ -352,6 +357,25 @@ const AdminUserMemberships = () => {
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <Label htmlFor="payment_method">Payment Method</Label>
+                <Select
+                  value={formData.payment_method}
+                  onValueChange={(value) => setFormData({ ...formData, payment_method: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select payment method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="stripe">Stripe</SelectItem>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="card">Card</SelectItem>
+                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <Button type="submit" className="w-full">
                 {editingUserMembership ? "Update" : "Assign"} Membership
               </Button>
@@ -373,14 +397,15 @@ const AdminUserMemberships = () => {
                 <TableHead>Start Date</TableHead>
                 <TableHead>End Date</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Payment</TableHead>
+                <TableHead>Payment Status</TableHead>
+                <TableHead>Payment Method</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {userMemberships.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     No user memberships found
                   </TableCell>
                 </TableRow>
@@ -410,6 +435,15 @@ const AdminUserMemberships = () => {
                       }`}>
                         {um.payment_status}
                       </span>
+                    </TableCell>
+                    <TableCell>
+                      {um.payment_method ? (
+                        <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800 capitalize">
+                          {um.payment_method.replace('_', ' ')}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">

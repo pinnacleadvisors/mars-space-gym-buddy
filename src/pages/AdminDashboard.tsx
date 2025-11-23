@@ -98,7 +98,7 @@ const AdminDashboard = () => {
           />
           <AdminStatCard
             title="Monthly Revenue"
-            value={`$${monthlyRevenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            value={`£${monthlyRevenue.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             icon={<DollarSign className="w-5 h-5 text-success" />}
             trend={format(new Date(), "MMMM yyyy")}
           />
