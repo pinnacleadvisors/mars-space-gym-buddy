@@ -74,7 +74,7 @@ const AdminUserMemberships = () => {
     end_date: "",
     status: "active",
     payment_status: "paid",
-    payment_method: "",
+    payment_method: "stripe",
   });
 
   useEffect(() => {
@@ -118,7 +118,7 @@ const AdminUserMemberships = () => {
       end_date: "",
       status: "active",
       payment_status: "paid",
-      payment_method: "",
+      payment_method: "stripe",
     });
     setEditingUserMembership(null);
   };
@@ -144,7 +144,7 @@ const AdminUserMemberships = () => {
         end_date: formData.end_date,
         status: formData.status,
         payment_status: formData.payment_status,
-        payment_method: formData.payment_method || null,
+        payment_method: formData.payment_method,
       };
 
       if (editingUserMembership) {
@@ -193,7 +193,7 @@ const AdminUserMemberships = () => {
       end_date: userMembership.end_date.split('T')[0],
       status: userMembership.status,
       payment_status: userMembership.payment_status,
-      payment_method: userMembership.payment_method || "",
+      payment_method: userMembership.payment_method || "stripe",
     });
     setDialogOpen(true);
   };
@@ -358,16 +358,16 @@ const AdminUserMemberships = () => {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="payment_method">Payment Method</Label>
+                <Label htmlFor="payment_method">Payment Method *</Label>
                 <Select
                   value={formData.payment_method}
                   onValueChange={(value) => setFormData({ ...formData, payment_method: value })}
+                  required
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
                     <SelectItem value="stripe">Stripe</SelectItem>
                     <SelectItem value="cash">Cash</SelectItem>
                     <SelectItem value="card">Card</SelectItem>
