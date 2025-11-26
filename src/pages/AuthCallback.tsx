@@ -15,6 +15,23 @@ const AuthCallback = () => {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
+        // First, check if there's already an existing session
+        // (Supabase client may have already processed tokens from the hash)
+        const { data: { session: existingSession } } = await supabase.auth.getSession();
+        
+        if (existingSession) {
+          console.log('AuthCallback: Existing session found for user:', existingSession.user?.id);
+          
+          // Clear the hash from the URL for cleaner appearance
+          if (window.location.hash) {
+            window.history.replaceState(null, '', window.location.pathname);
+          }
+          
+          // Redirect to dashboard
+          navigate('/dashboard', { replace: true });
+          return;
+        }
+
         // Get the hash from the URL (contains access_token, refresh_token, etc.)
         const hashParams = new URLSearchParams(window.location.hash.substring(1));
         const accessToken = hashParams.get('access_token');
@@ -55,16 +72,9 @@ const AuthCallback = () => {
           }
         }
 
-        // If no tokens in hash, check if there's an existing session
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          console.log('AuthCallback: Existing session found, redirecting to dashboard');
-          navigate('/dashboard', { replace: true });
-        } else {
-          console.log('AuthCallback: No session, redirecting to login');
-          // No session and no tokens - redirect to login
-          navigate('/login', { replace: true });
-        }
+        // No session and no tokens - redirect to login
+        console.log('AuthCallback: No session and no tokens, redirecting to login');
+        navigate('/login', { replace: true });
       } catch (err: any) {
         console.error('Auth callback error:', err);
         setError(err.message || 'An error occurred during authentication');

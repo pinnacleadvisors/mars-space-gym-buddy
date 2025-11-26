@@ -41,6 +41,9 @@ const queryClient = new QueryClient();
  * When a 404 occurs on GitHub Pages, the 404.html stores the original path
  * in sessionStorage and redirects to the root. This component reads that
  * stored path and navigates to it.
+ * 
+ * The hash (containing auth tokens) is preserved in the URL by 404.html,
+ * so Supabase client will detect and process the tokens automatically.
  */
 const GitHubPagesRedirectHandler = () => {
   const navigate = useNavigate();
@@ -51,19 +54,10 @@ const GitHubPagesRedirectHandler = () => {
     if (redirectPath && location.pathname === '/') {
       sessionStorage.removeItem('redirectPath');
       
-      // Parse the stored path to extract route and hash separately
-      const hashIndex = redirectPath.indexOf('#');
-      if (hashIndex !== -1) {
-        const path = redirectPath.substring(0, hashIndex) || '/auth/callback';
-        const hash = redirectPath.substring(hashIndex);
-        
-        // Use window.location to navigate with the hash preserved
-        // This ensures auth tokens in the hash are available to the target page
-        const basePath = getBasePath();
-        window.location.replace(window.location.origin + basePath + path + hash);
-      } else {
-        navigate(redirectPath, { replace: true });
-      }
+      // Navigate to the stored path using React Router
+      // The hash with auth tokens is already in the URL (preserved by 404.html)
+      // Supabase client will detect and process them automatically
+      navigate(redirectPath, { replace: true });
     }
   }, [navigate, location.pathname]);
 

@@ -6,7 +6,7 @@
   <script>
     // Single Page App redirect for GitHub Pages
     // This script takes the current URL and converts the path and query string
-    // into a hash fragment that can be handled by the React app.
+    // into a format that can be handled by the React app.
     // 
     // When GitHub Pages serves a 404 for routes like /auth/callback,
     // this script redirects to index.html with the original path preserved.
@@ -18,11 +18,13 @@
     // Preserve the hash (contains auth tokens from Supabase)
     const hash = window.location.hash;
     
-    // Redirect to the base path with the route encoded in sessionStorage
-    // The main app will pick this up and navigate accordingly
-    sessionStorage.setItem('redirectPath', pathToRedirect + window.location.search + hash);
+    // Store the route path in sessionStorage (without hash - hash will be preserved in URL)
+    sessionStorage.setItem('redirectPath', pathToRedirect + window.location.search);
+    
+    // Redirect to the base path, keeping the hash in the URL
+    // This allows Supabase client to detect auth tokens automatically
     window.location.replace(
-      window.location.origin + pathSegmentsToKeep + '/'
+      window.location.origin + pathSegmentsToKeep + '/' + hash
     );
   </script>
 </head>
