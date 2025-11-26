@@ -84,91 +84,56 @@ export const useAuth = () => {
 
   /**
    * Initializes user data on mount and sets up auth state listener
-   * Also handles session refresh on app load
+   * Uses getUser() instead of getSession() to verify the session with the server
+   * This prevents accessing protected routes after sign out via cached session data
    */
   useEffect(() => {
     let mounted = true;
 
     const initializeAuth = async () => {
       try {
-        // Get initial session and refresh if needed
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        // IMPORTANT: Use getUser() instead of getSession()
+        // getSession() returns cached data from localStorage and can be stale/invalid
+        // getUser() makes a network request to verify the token with the server
+        // This ensures proper logout handling and prevents unauthorized access
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
         
-        if (sessionError) {
-          console.error('Error getting session:', sessionError);
+        if (authError) {
+          // AuthSessionMissingError is expected when not logged in
+          if (authError.name !== 'AuthSessionMissingError') {
+            console.error('Error getting user:', authError);
+          }
           if (mounted) {
             setUser(null);
-    setLoading(false);
+            setLoading(false);
           }
           return;
         }
 
-        // Check if session exists and is valid
-        if (session) {
-          // Check if session is expired
-          const now = Date.now() / 1000; // Convert to seconds
-          if (session.expires_at && session.expires_at < now) {
-            // Session expired, try to refresh
-            console.log('Session expired, attempting refresh...');
-            const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession();
-            
-            if (refreshError || !refreshedSession) {
-              console.error('Error refreshing expired session:', refreshError);
-              if (mounted) {
-                setUser(null);
-                setLoading(false);
-              }
-              return;
-            }
-
-            // Use refreshed session
-            if (refreshedSession.user && mounted) {
-              const userData = await fetchUserData(refreshedSession.user);
-              if (userData) {
-              setUser(userData);
-              } else {
-                // Fallback to auth user data if fetchUserData fails
-                const fallbackUser: User = {
-                  id: refreshedSession.user.id,
-                  email: refreshedSession.user.email || '',
-                  full_name: refreshedSession.user.user_metadata?.full_name || '',
-                  phone: undefined,
-                  role: 'member',
-                  membership_status: 'inactive',
-                  membership_start_date: undefined,
-                  membership_end_date: undefined,
-                  created_at: refreshedSession.user.created_at || new Date().toISOString(),
-                  updated_at: new Date().toISOString(),
-                  email_verified: refreshedSession.user.email_confirmed_at !== null && refreshedSession.user.email_confirmed_at !== undefined,
-                };
-                setUser(fallbackUser);
-              }
-            }
-          } else if (session.user && mounted) {
-            // Session is valid, fetch user data
-            const userData = await fetchUserData(session.user);
-            if (userData) {
+        // If we have a valid user from the server, fetch their data
+        if (authUser && mounted) {
+          const userData = await fetchUserData(authUser);
+          if (userData) {
             setUser(userData);
-            } else {
-              // Fallback to auth user data if fetchUserData fails
-              const fallbackUser: User = {
-                id: session.user.id,
-                email: session.user.email || '',
-                full_name: session.user.user_metadata?.full_name || '',
-                phone: undefined,
-                role: 'member',
-                membership_status: 'inactive',
-                membership_start_date: undefined,
-                membership_end_date: undefined,
-                created_at: session.user.created_at || new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                email_verified: session.user.email_confirmed_at !== null && session.user.email_confirmed_at !== undefined,
-              };
-              setUser(fallbackUser);
-            }
+          } else {
+            // Fallback to auth user data if fetchUserData fails
+            const fallbackUser: User = {
+              id: authUser.id,
+              email: authUser.email || '',
+              full_name: authUser.user_metadata?.full_name || '',
+              phone: undefined,
+              role: 'member',
+              membership_status: 'inactive',
+              membership_start_date: undefined,
+              membership_end_date: undefined,
+              created_at: authUser.created_at || new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              email_verified: authUser.email_confirmed_at !== null && authUser.email_confirmed_at !== undefined,
+            };
+            setUser(fallbackUser);
           }
         } else if (mounted) {
-          // No session
+          // No valid user from server
           setUser(null);
         }
       } catch (error) {
