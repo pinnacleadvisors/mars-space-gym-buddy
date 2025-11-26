@@ -21,21 +21,26 @@ const AuthCallback = () => {
         const refreshToken = hashParams.get('refresh_token');
         const type = hashParams.get('type'); // 'signup', 'recovery', 'magiclink', etc.
 
-        // If we have tokens in the hash, the Supabase client will automatically
-        // detect and process them. We just need to wait for the session to be set.
-        if (accessToken) {
-          // The Supabase client automatically handles the hash fragment
-          // Wait a moment for the session to be established
-          const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        console.log('AuthCallback: Processing tokens, type:', type);
+
+        // If we have tokens in the hash, explicitly set the session
+        if (accessToken && refreshToken) {
+          console.log('AuthCallback: Setting session with tokens');
           
-          if (sessionError) {
-            console.error('Session error:', sessionError);
-            setError(sessionError.message);
+          // Explicitly set the session using the tokens from the URL
+          const { data, error: setSessionError } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (setSessionError) {
+            console.error('Session set error:', setSessionError);
+            setError(setSessionError.message);
             return;
           }
 
-          if (session) {
-            console.log('Auth callback successful, session established');
+          if (data.session) {
+            console.log('Auth callback successful, session established for user:', data.session.user?.id);
             
             // Clear the hash from the URL for cleaner appearance
             window.history.replaceState(null, '', window.location.pathname);
@@ -53,8 +58,10 @@ const AuthCallback = () => {
         // If no tokens in hash, check if there's an existing session
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
+          console.log('AuthCallback: Existing session found, redirecting to dashboard');
           navigate('/dashboard', { replace: true });
         } else {
+          console.log('AuthCallback: No session, redirecting to login');
           // No session and no tokens - redirect to login
           navigate('/login', { replace: true });
         }

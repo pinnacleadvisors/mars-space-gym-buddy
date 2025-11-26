@@ -1,8 +1,9 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { AdminRoute } from "./components/auth/AdminRoute";
@@ -35,6 +36,40 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+/**
+ * Handles GitHub Pages SPA redirect
+ * When a 404 occurs on GitHub Pages, the 404.html stores the original path
+ * in sessionStorage and redirects to the root. This component reads that
+ * stored path and navigates to it.
+ */
+const GitHubPagesRedirectHandler = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    const redirectPath = sessionStorage.getItem('redirectPath');
+    if (redirectPath && location.pathname === '/') {
+      sessionStorage.removeItem('redirectPath');
+      
+      // Parse the stored path to extract route and hash separately
+      const hashIndex = redirectPath.indexOf('#');
+      if (hashIndex !== -1) {
+        const path = redirectPath.substring(0, hashIndex) || '/auth/callback';
+        const hash = redirectPath.substring(hashIndex);
+        
+        // Use window.location to navigate with the hash preserved
+        // This ensures auth tokens in the hash are available to the target page
+        const basePath = getBasePath();
+        window.location.replace(window.location.origin + basePath + path + hash);
+      } else {
+        navigate(redirectPath, { replace: true });
+      }
+    }
+  }, [navigate, location.pathname]);
+
+  return null;
+};
+
 const App = () => {
   const basePath = getBasePath() || undefined;
   
@@ -45,6 +80,7 @@ const App = () => {
         <Toaster />
         <Sonner />
           <BrowserRouter basename={basePath}>
+          <GitHubPagesRedirectHandler />
           <AppLayout>
             <Routes>
             {/* Public Routes */}
