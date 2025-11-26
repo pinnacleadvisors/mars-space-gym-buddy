@@ -11,9 +11,11 @@ import {
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useNavigate } from "react-router-dom";
 import { Calendar, User, Settings, LogOut } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 export function TopBar() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -56,7 +58,10 @@ export function TopBar() {
                 Settings
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate("/login")}>
+              <DropdownMenuItem onClick={async () => {
+                await logout();
+                navigate("/login");
+              }}>
                 <LogOut className="mr-2 h-4 w-4" />
                 Log out
               </DropdownMenuItem>
