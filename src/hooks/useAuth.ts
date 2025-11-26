@@ -322,7 +322,7 @@ export const useAuth = () => {
           data: {
             full_name: fullName,
           },
-          emailRedirectTo: getFullRedirectUrl('/dashboard'),
+          emailRedirectTo: getFullRedirectUrl('/auth/callback'),
         },
       });
 

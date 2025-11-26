@@ -30,6 +30,7 @@ import Rewards from "./pages/Rewards";
 import Settings from "./pages/Settings";
 import AdminRewardClaim from "./pages/AdminRewardClaim";
 import EmailVerificationRequired from "./pages/EmailVerificationRequired";
+import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -52,6 +53,7 @@ const App = () => {
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/auth/callback" element={<AuthCallback />} />
             
             {/* Email Verification Route - Requires Auth but not email verification */}
             <Route

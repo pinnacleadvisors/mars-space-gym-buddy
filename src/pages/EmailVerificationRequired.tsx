@@ -23,7 +23,7 @@ const EmailVerificationRequired = () => {
         type: 'signup',
         email: user.email,
         options: {
-          emailRedirectTo: getFullRedirectUrl('/dashboard'),
+          emailRedirectTo: getFullRedirectUrl('/auth/callback'),
         },
       });
 

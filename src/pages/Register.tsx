@@ -54,7 +54,7 @@ const Register = () => {
           data: {
             full_name: sanitizedFullName,
           },
-          emailRedirectTo: getFullRedirectUrl('/dashboard'),
+          emailRedirectTo: getFullRedirectUrl('/auth/callback'),
         },
       });
 
