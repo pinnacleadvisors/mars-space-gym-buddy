@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Mars Space Gym</title>
+  <script>
+    // Single Page App redirect for GitHub Pages
+    // This script takes the current URL and converts the path and query string
+    // into a hash fragment that can be handled by the React app.
+    // 
+    // When GitHub Pages serves a 404 for routes like /auth/callback,
+    // this script redirects to index.html with the original path preserved.
+    
+    const segment = 1; // Number of path segments to keep (for repo name in GitHub Pages subdirectory)
+    const pathSegmentsToKeep = window.location.pathname.split('/').slice(0, 1 + segment).join('/');
+    const pathToRedirect = window.location.pathname.slice(pathSegmentsToKeep.length);
+    
+    // Preserve the hash (contains auth tokens from Supabase)
+    const hash = window.location.hash;
+    
+    // Redirect to the base path with the route encoded in sessionStorage
+    // The main app will pick this up and navigate accordingly
+    sessionStorage.setItem('redirectPath', pathToRedirect + window.location.search + hash);
+    window.location.replace(
+      window.location.origin + pathSegmentsToKeep + '/'
+    );
+  </script>
+</head>
+<body>
+  <noscript>
+    <p>Redirecting...</p>
+    <p>If you are not redirected, <a href="/">click here</a>.</p>
+  </noscript>
+</body>
+</html>
+
