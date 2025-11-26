@@ -5,22 +5,102 @@ import { Loader2 } from 'lucide-react';
 
 /**
  * Auth Callback Page
- * Handles email verification and OAuth callbacks from Supabase.
+ * Handles email verification and OAuth callbacks (Google, etc.) from Supabase.
  * Processes the access token from the URL hash and redirects to dashboard.
+ * 
+ * For OAuth users (Google Sign In):
+ * - Creates profile and assigns 'member' role if they don't exist
+ * - Uses user metadata from OAuth provider (full_name, avatar_url, etc.)
  */
 const AuthCallback = () => {
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string>('Verifying your account...');
+
+  /**
+   * Ensures profile and role exist for OAuth users
+   * This is necessary because OAuth users don't go through the normal registration flow
+   * and may not trigger the database trigger that creates profile/role
+   */
+  const ensureProfileAndRole = async (userId: string, userMetadata: any) => {
+    try {
+      setStatus('Setting up your profile...');
+      
+      // Check if profile exists
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .single();
+
+      // Create profile if it doesn't exist
+      if (!existingProfile) {
+        const fullName = userMetadata?.full_name || 
+                        userMetadata?.name || 
+                        `${userMetadata?.given_name || ''} ${userMetadata?.family_name || ''}`.trim() ||
+                        '';
+        const avatarUrl = userMetadata?.avatar_url || userMetadata?.picture || null;
+        
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            full_name: fullName,
+            avatar_url: avatarUrl,
+          });
+
+        if (profileError && profileError.code !== '23505') { // Ignore duplicate key errors
+          console.error('Error creating profile for OAuth user:', profileError);
+        } else {
+          console.log('Profile created for OAuth user:', userId);
+        }
+      }
+
+      // Check if role exists
+      const { data: existingRole } = await supabase
+        .from('user_roles')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('role', 'member')
+        .single();
+
+      // Create role if it doesn't exist
+      if (!existingRole) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({
+            user_id: userId,
+            role: 'member',
+          });
+
+        if (roleError && roleError.code !== '23505') { // Ignore duplicate key errors
+          console.error('Error creating role for OAuth user:', roleError);
+        } else {
+          console.log('Member role assigned to OAuth user:', userId);
+        }
+      }
+    } catch (error) {
+      console.error('Error ensuring profile and role for OAuth user:', error);
+      // Don't throw - this is a fallback mechanism
+    }
+  };
 
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
+        setStatus('Verifying your account...');
+        
         // First, check if there's already an existing session
         // (Supabase client may have already processed tokens from the hash)
         const { data: { session: existingSession } } = await supabase.auth.getSession();
         
         if (existingSession) {
           console.log('AuthCallback: Existing session found for user:', existingSession.user?.id);
+          
+          // Ensure profile and role exist for OAuth users
+          if (existingSession.user) {
+            await ensureProfileAndRole(existingSession.user.id, existingSession.user.user_metadata);
+          }
           
           // Clear the hash from the URL for cleaner appearance
           if (window.location.hash) {
@@ -42,6 +122,7 @@ const AuthCallback = () => {
 
         // If we have tokens in the hash, explicitly set the session
         if (accessToken && refreshToken) {
+          setStatus('Establishing your session...');
           console.log('AuthCallback: Setting session with tokens');
           
           // Explicitly set the session using the tokens from the URL
@@ -58,6 +139,11 @@ const AuthCallback = () => {
 
           if (data.session) {
             console.log('Auth callback successful, session established for user:', data.session.user?.id);
+            
+            // Ensure profile and role exist for OAuth users
+            if (data.session.user) {
+              await ensureProfileAndRole(data.session.user.id, data.session.user.user_metadata);
+            }
             
             // Clear the hash from the URL for cleaner appearance
             window.history.replaceState(null, '', window.location.pathname);
@@ -107,7 +193,7 @@ const AuthCallback = () => {
     <div className="min-h-screen flex items-center justify-center bg-gradient-hero p-4">
       <div className="text-center space-y-4">
         <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary" />
-        <p className="text-muted-foreground">Verifying your account...</p>
+        <p className="text-muted-foreground">{status}</p>
       </div>
     </div>
   );

@@ -82,6 +82,7 @@ mars-space-gym-buddy/
 │   │   ├── ForgotPassword.tsx      # Password reset request
 │   │   ├── ResetPassword.tsx      # Password reset
 │   │   ├── EmailVerificationRequired.tsx # Email verification required page
+│   │   ├── AuthCallback.tsx       # OAuth and email verification callback handler (Google OAuth, email links)
 │   │   ├── Dashboard.tsx          # User dashboard (✅ fully implemented with membership status, quick actions, statistics, activity feed)
 │   │   ├── Classes.tsx            # Class listings (✅ fully implemented with booking, filters, search)
 │   │   ├── Bookings.tsx           # User bookings (✅ fully implemented with list/calendar views, cancel functionality)
@@ -529,10 +530,11 @@ Used in `.github/workflows/github-actions-demo.yml`:
 
 ### Public Routes
 - `/` - Landing page
-- `/login` - User login
-- `/register` - User registration
+- `/login` - User login (supports email/password and Google OAuth)
+- `/register` - User registration (supports email/password and Google OAuth)
 - `/forgot-password` - Password reset request
 - `/reset-password` - Password reset form
+- `/auth/callback` - OAuth and email verification callback handler (processes tokens from Google OAuth, email verification links)
 
 ### Email Verification Route
 - `/verify-email` - Email verification required page (requires authentication but not email verification)
@@ -739,7 +741,7 @@ Defined in `src/index.css`:
   - **TypeScript Types**: `database.ts` reflects the current state after migrations are run
 
 ### Authentication Flow
-1. **User Signup**:
+1. **User Signup (Email/Password)**:
    - User submits registration form with email, password, and full name
    - `supabase.auth.signUp()` creates auth user and triggers `handle_new_user()` database function
    - `handle_new_user()` trigger (SECURITY DEFINER) automatically:
@@ -755,27 +757,79 @@ Defined in `src/index.css`:
      - After signup, user is redirected to `/verify-email` page (not dashboard)
      - User must click the verification link in the email before accessing protected routes
      - **Future Implementation**: OTP code verification can be added in the future if needed (see `Register.tsx` for TODO comment)
-2. **Email Verification Flow**:
-   - After signup, user is automatically redirected to `/verify-email` page
+2. **Google OAuth Signup/Login**:
+   - User clicks "Sign in with Google" or "Sign up with Google" button
+   - `supabase.auth.signInWithOAuth()` redirects user to Google's OAuth consent page
+   - User authenticates with Google and grants permissions
+   - Google redirects back to `/auth/callback` with auth tokens in the URL hash
+   - `AuthCallback.tsx` processes the tokens and establishes the session
+   - **Profile/Role Creation**: `AuthCallback.tsx` calls `ensureProfileAndRole()` to:
+     - Create profile with `full_name` from Google (using `user_metadata.name` or `user_metadata.full_name`)
+     - Set `avatar_url` from Google profile picture (using `user_metadata.picture`)
+     - Assign 'member' role to the user
+   - User is redirected to `/dashboard` after successful authentication
+   - **Note**: Google OAuth users skip email verification since Google already verified the email
+3. **Apple OAuth (Future Implementation)**:
+   - Apple Sign In is commented out but saved for future implementation
+   - See `Login.tsx` and `Register.tsx` for TODO comments with Apple OAuth code
+4. **Email Verification Flow**:
+   - After email/password signup, user is automatically redirected to `/verify-email` page
    - User receives verification email with link
    - User must click the link in the email to verify their account
    - Clicking the verification link verifies email and redirects to dashboard
    - If user tries to access protected routes without verification, `ProtectedRoute` shows `EmailVerificationRequired` page
    - User can resend verification email from `EmailVerificationRequired` page
    - **Route**: `/verify-email` - Dedicated route for email verification (requires authentication but not email verification)
-3. Admin login checks `has_role()` RPC function
-4. `useAdminAuth` hook manages admin state and redirects
-5. `useAuth` hook manages user authentication and session
+   - **Note**: OAuth users (Google) are considered email-verified by default
+5. Admin login checks `has_role()` RPC function
+6. `useAdminAuth` hook manages admin state and redirects
+7. `useAuth` hook manages user authentication and session
    - **Fallback User Creation**: If profile/role queries fail, creates minimal user from auth user data to prevent redirect loops
    - **Auth State Listener**: Automatically updates user data on SIGNED_IN, TOKEN_REFRESHED, and USER_UPDATED events
    - **Immediate Fallback User**: On SIGNED_IN event, immediately sets fallback user from session data before fetching full profile data
    - **Error Handling**: Always creates user object even if database queries fail, ensuring login completes successfully
-6. `useSessionManager` hook monitors session expiration and shows warnings
-7. Session automatically refreshes on app load if expired
-8. Session warnings shown at 15 minutes and 5 minutes before expiration
-9. Email verification enforced via `ProtectedRoute` component (users verify via link in email, not OTP code)
-10. Account lockout after 5 failed login attempts (15 minute lockout duration)
-11. **Login Flow**: After successful login, waits 1 second before navigation to ensure auth state listener has processed and set user in useAuth hook
+8. `useSessionManager` hook monitors session expiration and shows warnings
+9. Session automatically refreshes on app load if expired
+10. Session warnings shown at 15 minutes and 5 minutes before expiration
+11. Email verification enforced via `ProtectedRoute` component (users verify via link in email, not OTP code)
+12. Account lockout after 5 failed login attempts (15 minute lockout duration)
+13. **Login Flow**: After successful login, waits 1 second before navigation to ensure auth state listener has processed and set user in useAuth hook
+
+### Google OAuth Setup (Supabase Dashboard)
+To enable Google Sign In, configure the following in Supabase Dashboard:
+
+1. **Enable Google Provider**:
+   - Go to Supabase Dashboard → Authentication → Providers
+   - Find "Google" and click to enable it
+   - You'll need Client ID and Client Secret from Google Cloud Console
+
+2. **Google Cloud Console Setup**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select existing one
+   - Navigate to "APIs & Services" → "Credentials"
+   - Click "Create Credentials" → "OAuth 2.0 Client IDs"
+   - Application type: "Web application"
+   - Add Authorized JavaScript origins:
+     - `https://yggvabrltcxvkiyjixdv.supabase.co` (your Supabase project URL)
+     - `http://localhost:8080` (for local development)
+   - Add Authorized redirect URIs:
+     - `https://yggvabrltcxvkiyjixdv.supabase.co/auth/v1/callback` (Supabase callback)
+   - Copy the Client ID and Client Secret
+
+3. **Configure in Supabase**:
+   - Paste the Google Client ID and Client Secret in Supabase Dashboard
+   - Save the configuration
+
+4. **Redirect URLs Configuration**:
+   - The app uses `getFullRedirectUrl('/auth/callback')` for OAuth redirects
+   - Development: `http://localhost:8080/auth/callback`
+   - Production: `https://pinnacleadvisors.github.io/mars-space-gym-buddy/auth/callback`
+
+5. **OAuth Query Parameters**:
+   - `access_type: 'offline'` - Requests refresh token for longer sessions
+   - `prompt: 'consent'` - Always shows consent screen (useful for testing)
+
+**Note**: Apple Sign In is saved for future implementation. See commented code in `Login.tsx` and `Register.tsx`.
 
 ### Membership Flow
 1. User clicks "Register Membership" → `create-checkout` function
