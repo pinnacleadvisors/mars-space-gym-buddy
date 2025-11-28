@@ -14,6 +14,8 @@ interface UserMembership {
   end_date: string;
   status: string;
   payment_status: string;
+  payment_method: string | null;
+  stripe_subscription_id: string | null;
 }
 
 interface Membership {
@@ -28,7 +30,11 @@ export default function ManageMemberships() {
   const [loading, setLoading] = useState(true);
   const [userMembership, setUserMembership] = useState<UserMembership | null>(null);
   const [membership, setMembership] = useState<Membership | null>(null);
+  const [availableMemberships, setAvailableMemberships] = useState<Membership[]>([]);
+  const [showChangePlan, setShowChangePlan] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
+  const [isCancellationRequested, setIsCancellationRequested] = useState(false);
+  const [remainingDays, setRemainingDays] = useState<number | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -36,6 +42,12 @@ export default function ManageMemberships() {
     fetchData();
     checkSubscriptionStatus();
   }, []);
+
+  useEffect(() => {
+    if (userMembership) {
+      checkCancellationStatus();
+    }
+  }, [userMembership]);
 
   // Check subscription status on page load and after payment
   const checkSubscriptionStatus = async () => {
@@ -57,6 +69,63 @@ export default function ManageMemberships() {
       }
     } catch (error) {
       console.error("Error checking subscription:", error);
+    }
+  };
+
+  // Check if membership is cancelled but still has remaining days
+  const checkCancellationStatus = async () => {
+    if (!userMembership) {
+      setIsCancellationRequested(false);
+      setRemainingDays(null);
+      return;
+    }
+
+    try {
+      const endDate = new Date(userMembership.end_date);
+      const today = new Date();
+      const daysRemaining = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+      // Calculate remaining days if end_date is in the future
+      if (endDate > today && daysRemaining > 0) {
+        setRemainingDays(daysRemaining);
+        
+        // Check localStorage to see if cancellation was requested
+        const cancellationKey = `membership_cancelled_${userMembership.id}`;
+        const cancellationData = localStorage.getItem(cancellationKey);
+        
+        if (cancellationData) {
+          try {
+            const { cancelledAt, endDate: storedEndDate } = JSON.parse(cancellationData);
+            console.log("Found cancellation data:", { storedEndDate, currentEndDate: userMembership.end_date, daysRemaining });
+            // Verify the end date matches (membership hasn't changed)
+            if (storedEndDate === userMembership.end_date) {
+              setIsCancellationRequested(true);
+              console.log("Setting cancellation requested to true");
+            } else {
+              // End date changed, clear old cancellation data
+              console.log("End date mismatch, clearing cancellation data");
+              localStorage.removeItem(cancellationKey);
+              setIsCancellationRequested(false);
+            }
+          } catch (parseError) {
+            console.error("Error parsing cancellation data:", parseError);
+            localStorage.removeItem(cancellationKey);
+            setIsCancellationRequested(false);
+          }
+        } else {
+          console.log("No cancellation data found in localStorage");
+          setIsCancellationRequested(false);
+        }
+      } else {
+        setRemainingDays(null);
+        setIsCancellationRequested(false);
+        // Clear cancellation data if membership has expired
+        const cancellationKey = `membership_cancelled_${userMembership.id}`;
+        localStorage.removeItem(cancellationKey);
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking cancellation status:", error);
     }
   };
 
@@ -94,30 +163,42 @@ export default function ManageMemberships() {
         return;
       }
 
-      // Fetch the £150 monthly membership
-      const { data: membershipData, error: membershipError } = await supabase
+      // First, fetch user's current membership (any membership)
+      const { data: userMembershipData, error: userMembershipError } = await supabase
+        .from("user_memberships")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (userMembershipError) throw userMembershipError;
+      setUserMembership(userMembershipData);
+
+      // Always fetch all available memberships for the change plan feature
+      const { data: allMemberships, error: membershipsError } = await supabase
         .from("memberships")
         .select("*")
-        .eq("price", 150)
-        .single();
+        .order("created_at", { ascending: false });
 
-      if (membershipError) throw membershipError;
-      setMembership(membershipData);
+      if (membershipsError) throw membershipsError;
+      setAvailableMemberships(allMemberships || []);
 
-      // Fetch user's current membership for THIS specific membership
-      // First get the membership, then check if user has it
-      if (membershipData) {
-        const { data: userMembershipData, error: userMembershipError } = await supabase
-          .from("user_memberships")
+      // If user has a membership, fetch the membership details
+      if (userMembershipData) {
+        const { data: membershipData, error: membershipError } = await supabase
+          .from("memberships")
           .select("*")
-          .eq("user_id", user.id)
-          .eq("membership_id", membershipData.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+          .eq("id", userMembershipData.membership_id)
+          .single();
 
-        if (userMembershipError) throw userMembershipError;
-        setUserMembership(userMembershipData);
+        if (membershipError) throw membershipError;
+        setMembership(membershipData);
+      } else {
+        // Set the first membership as the default one to display (most recently created)
+        if (allMemberships && allMemberships.length > 0) {
+          setMembership(allMemberships[0]);
+        }
       }
     } catch (error: any) {
       toast({
@@ -130,18 +211,30 @@ export default function ManageMemberships() {
     }
   };
 
-  const handleRegister = async () => {
+  const handleRegister = async (selectedMembershipId?: string) => {
     setActionLoading(true);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
+      // Determine which membership to use
+      const membershipToUse = selectedMembershipId 
+        ? availableMemberships.find(m => m.id === selectedMembershipId) || membership
+        : membership;
+
+      if (!membershipToUse) {
+        throw new Error("No membership selected");
+      }
+
       // Create Stripe checkout session
+      // Note: Currently create-checkout is hardcoded to use £150 membership
+      // This would need to be updated to accept membership_id parameter
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
+        body: membershipToUse ? { membership_id: membershipToUse.id } : undefined,
       });
 
       if (error) throw error;
@@ -300,10 +393,28 @@ export default function ManageMemberships() {
 
       toast({
         title: "Membership Cancelled",
-        description: responseData?.message || "Your membership has been cancelled successfully.",
+        description: responseData?.message || "Your membership has been cancelled successfully. Benefits will continue until the end date.",
       });
 
+      // Store cancellation status in localStorage FIRST, before fetchData updates state
+      if (userMembership) {
+        const cancellationKey = `membership_cancelled_${userMembership.id}`;
+        const cancellationData = {
+          cancelledAt: new Date().toISOString(),
+          endDate: userMembership.end_date
+        };
+        localStorage.setItem(cancellationKey, JSON.stringify(cancellationData));
+        console.log("✅ Cancellation saved to localStorage:", { key: cancellationKey, data: cancellationData });
+      }
+
+      // Refresh data to get updated membership
       await fetchData();
+      
+      // Explicitly call checkCancellationStatus after fetchData to ensure state is updated
+      // The useEffect will also call it, but this ensures it happens immediately
+      setTimeout(() => {
+        checkCancellationStatus();
+      }, 100);
     } catch (error: any) {
       console.error("Error cancelling membership:", error);
       const errorMessage = error?.message || 
@@ -371,15 +482,32 @@ export default function ManageMemberships() {
 
   return (
     <div className="container mx-auto p-6 max-w-4xl">
-      <h1 className="text-3xl font-bold mb-6">Manage Membership</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Manage Membership</h1>
+        {/* Change Plan Toggle - Only show when user has a membership */}
+        {userMembership && (
+          <Button
+            variant={showChangePlan ? "default" : "outline"}
+            onClick={() => setShowChangePlan(!showChangePlan)}
+          >
+            {showChangePlan ? "Hide Plans" : "Change Plan"}
+          </Button>
+        )}
+      </div>
 
       {/* Current Membership Status */}
-      {userMembership && (
+      {userMembership && !showChangePlan && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle>Current Membership</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
+            {membership && (
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Plan Name:</span>
+                <span className="font-medium">{membership.name}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Status:</span>
               <Badge variant={isActive ? "default" : "secondary"}>
@@ -400,17 +528,92 @@ export default function ManageMemberships() {
                 {userMembership.payment_status}
               </Badge>
             </div>
+            {/* Cancellation message */}
+            {isCancellationRequested && remainingDays !== null && remainingDays > 0 && (
+              <div className="pt-3 border-t">
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    <strong>Membership plan has been cancelled</strong> but you have <strong>{remainingDays} {remainingDays === 1 ? 'day' : 'days'}</strong> remaining. Your benefits will continue until {new Date(userMembership.end_date).toLocaleDateString()}.
+                  </p>
+                </div>
+              </div>
+            )}
+            {/* Cancel button for all active memberships */}
+            {isActive && !isCancellationRequested && (
+              <div className="pt-3 border-t">
+                <Button 
+                  onClick={handleCancel} 
+                  variant="destructive" 
+                  disabled={actionLoading}
+                  className="w-full"
+                >
+                  {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Cancel Membership
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Membership Plan */}
-      {membership && (
+      {/* Available Membership Plans - Show when user has no membership OR when change plan is toggled */}
+      {(!userMembership || showChangePlan) && availableMemberships.length > 0 && (
+        <div className="space-y-4">
+          <h2 className="text-2xl font-semibold">
+            {showChangePlan ? "Change Your Plan" : "Available Membership Plans"}
+          </h2>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {availableMemberships.map((plan) => {
+              const isCurrentPlan = userMembership?.membership_id === plan.id;
+              return (
+                <Card 
+                  key={plan.id} 
+                  className={`flex flex-col ${isCurrentPlan ? "ring-2 ring-primary" : ""}`}
+                >
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle>{plan.name}</CardTitle>
+                        <CardDescription>
+                          {plan.price ? `£${plan.price}` : "Free"} {plan.price ? "per month" : ""} • {plan.access_level || "Standard"}
+                        </CardDescription>
+                      </div>
+                      {isCurrentPlan && (
+                        <Badge variant="default">Current</Badge>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex-1 flex flex-col justify-between space-y-4">
+                    <div>
+                      <p className="text-muted-foreground text-sm">
+                        Duration: {plan.duration_days} days
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={() => handleRegister(plan.id)} 
+                      disabled={actionLoading || isCurrentPlan}
+                      className="w-full"
+                      variant={isCurrentPlan ? "secondary" : "default"}
+                    >
+                      {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {isCurrentPlan ? "Current Plan" : showChangePlan ? "Switch to This Plan" : "Start Membership"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Current Membership Plan - Show only for Stripe memberships when user has a membership and change plan is not toggled */}
+      {userMembership && membership && !showChangePlan && 
+       (userMembership.payment_method === "stripe" || userMembership.stripe_subscription_id) && (
         <Card>
           <CardHeader>
             <CardTitle>{membership.name}</CardTitle>
             <CardDescription>
-              £{membership.price} per month • {membership.access_level}
+              {membership.price ? `£${membership.price}` : "Free"} {membership.price ? "per month" : ""} • {membership.access_level || "Standard"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -419,14 +622,6 @@ export default function ManageMemberships() {
             </p>
 
             <div className="flex gap-3 flex-wrap">
-              {/* Only show "Start Membership" if user doesn't have this specific membership active */}
-              {!hasActiveMembership && (
-                <Button onClick={handleRegister} disabled={actionLoading}>
-                  {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Start Membership
-                </Button>
-              )}
-
               {/* Show renew and cancel options if user has active membership for this specific membership */}
               {hasActiveMembership && (
                 <>
@@ -434,10 +629,13 @@ export default function ManageMemberships() {
                     {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Start Membership
                   </Button>
-                  <Button onClick={handleCancel} variant="destructive" disabled={actionLoading}>
-                    {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Cancel Membership
-                  </Button>
+                  {/* Only show cancel button for Stripe memberships */}
+                  {(userMembership?.payment_method === "stripe" || userMembership?.stripe_subscription_id) && (
+                    <Button onClick={handleCancel} variant="destructive" disabled={actionLoading}>
+                      {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Cancel Membership
+                    </Button>
+                  )}
                 </>
               )}
 
@@ -452,6 +650,17 @@ export default function ManageMemberships() {
                 </Button>
               )}
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* No memberships available */}
+      {!userMembership && availableMemberships.length === 0 && !loading && (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground text-center">
+              No membership plans are currently available. Please contact support.
+            </p>
           </CardContent>
         </Card>
       )}

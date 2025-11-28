@@ -85,18 +85,7 @@ serve(async (req) => {
       endDate: currentPeriodEnd.toISOString() 
     });
 
-    // Get the membership from database
-    const { data: membership } = await supabaseClient
-      .from("memberships")
-      .select("*")
-      .eq("price", 150)
-      .single();
-
-    if (!membership) {
-      throw new Error("Membership not found in database");
-    }
-
-    // Update or create user_membership record
+    // Check for existing user_membership first
     const { data: existingMembership } = await supabaseClient
       .from("user_memberships")
       .select("*")
@@ -104,6 +93,55 @@ serve(async (req) => {
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
+
+    let membershipId: string;
+
+    if (existingMembership) {
+      // Use existing membership_id if available
+      membershipId = existingMembership.membership_id;
+      logStep("Using existing membership", { membershipId });
+    } else {
+      // Try to find membership based on Stripe subscription price
+      // Get the price from the subscription's first item
+      const subscriptionPriceId = subscription.items.data[0]?.price?.id;
+      const subscriptionPriceAmount = subscription.items.data[0]?.price?.unit_amount;
+      
+      logStep("Looking for membership by price", { 
+        priceId: subscriptionPriceId,
+        priceAmount: subscriptionPriceAmount 
+      });
+
+      // Try to find membership by price (convert from cents to pounds)
+      const priceInPounds = subscriptionPriceAmount ? subscriptionPriceAmount / 100 : null;
+      
+      let membership;
+      if (priceInPounds) {
+        const { data: membershipData } = await supabaseClient
+          .from("memberships")
+          .select("*")
+          .eq("price", priceInPounds)
+          .maybeSingle();
+        membership = membershipData;
+      }
+
+      // If not found by price, get the first available membership as fallback
+      if (!membership) {
+        const { data: fallbackMembership } = await supabaseClient
+          .from("memberships")
+          .select("*")
+          .order("created_at", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        membership = fallbackMembership;
+      }
+
+      if (!membership) {
+        throw new Error("No membership found in database");
+      }
+
+      membershipId = membership.id;
+      logStep("Found membership", { membershipId, membershipName: membership.name });
+    }
 
     if (existingMembership) {
       // Update existing membership
@@ -134,7 +172,7 @@ serve(async (req) => {
         .from("user_memberships")
         .insert({
           user_id: user.id,
-          membership_id: membership.id,
+          membership_id: membershipId,
           start_date: startDate.toISOString(),
           end_date: currentPeriodEnd.toISOString(),
           status: "active",

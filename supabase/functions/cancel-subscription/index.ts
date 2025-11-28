@@ -122,8 +122,8 @@ serve(async (req) => {
     });
 
     if (!isStripeMembership) {
-      // Non-Stripe membership - just update database status
-      logStep("Non-Stripe membership - cancelling in database only", { 
+      // Non-Stripe membership - keep active until end_date
+      logStep("Non-Stripe membership - keeping active until end_date", { 
         paymentMethod: paymentMethod || 'null',
         membershipId: userMembership.id,
         userId: user.id
@@ -136,8 +136,10 @@ serve(async (req) => {
           userId: user.id
         });
 
+        // Keep status as "active" to maintain benefits until end_date
+        // The membership will naturally expire at end_date
         const updatePayload = {
-          status: "cancelled",
+          status: "active", // Keep active until end_date
           updated_at: new Date().toISOString()
         };
 
@@ -235,13 +237,14 @@ serve(async (req) => {
       const customers = await stripe.customers.list({ email: user.email, limit: 1 });
       
       if (customers.data.length === 0) {
-        // No Stripe customer but membership marked as Stripe - update database only
-        logStep("No Stripe customer found but membership is Stripe - cancelling in database only");
+        // No Stripe customer but membership marked as Stripe - keep active until end_date
+        logStep("No Stripe customer found but membership is Stripe - keeping active until end_date");
         
+        // Keep status as "active" to maintain benefits until end_date
         const { error: updateError } = await supabaseClient
           .from("user_memberships")
           .update({
-            status: "cancelled",
+            status: "active", // Keep active until end_date
             updated_at: new Date().toISOString()
           })
           .eq("id", userMembership.id);
@@ -253,7 +256,7 @@ serve(async (req) => {
 
         return new Response(JSON.stringify({
           success: true,
-          message: "Membership cancelled successfully"
+          message: "Membership will remain active until the end date. Benefits will continue until then."
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
@@ -271,13 +274,14 @@ serve(async (req) => {
       });
 
       if (subscriptions.data.length === 0) {
-        // No active subscription but membership marked as Stripe - update database only
-        logStep("No active Stripe subscription found - cancelling in database only");
+        // No active subscription but membership marked as Stripe - keep active until end_date
+        logStep("No active Stripe subscription found - keeping active until end_date");
         
+        // Keep status as "active" to maintain benefits until end_date
         const { error: updateError } = await supabaseClient
           .from("user_memberships")
           .update({
-            status: "cancelled",
+            status: "active", // Keep active until end_date
             updated_at: new Date().toISOString()
           })
           .eq("id", userMembership.id);
@@ -289,7 +293,7 @@ serve(async (req) => {
 
         return new Response(JSON.stringify({
           success: true,
-          message: "Membership cancelled successfully"
+          message: "Membership will remain active until the end date. Benefits will continue until then."
         }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
@@ -312,10 +316,12 @@ serve(async (req) => {
     });
 
     // Update user_membership in database
+    // Keep status as "active" to maintain benefits until period end
+    // Stripe will handle the actual cancellation at period end
     const { error: updateError } = await supabaseClient
       .from("user_memberships")
       .update({
-        status: "cancelled",
+        status: "active", // Keep active until period end - Stripe handles cancellation
         updated_at: new Date().toISOString()
       })
       .eq("id", userMembership.id);
@@ -323,12 +329,12 @@ serve(async (req) => {
     if (updateError) {
       logStep("Error updating membership status", { error: updateError });
     } else {
-      logStep("Membership status updated to cancelled");
+      logStep("Membership will remain active until period end");
     }
 
     return new Response(JSON.stringify({
       success: true,
-      message: "Subscription will be cancelled at the end of the billing period",
+      message: "Subscription will be cancelled at the end of the billing period. Your membership benefits will continue until then.",
       cancel_at: new Date(canceledSubscription.cancel_at! * 1000).toISOString()
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
