@@ -74,7 +74,7 @@ const AdminUserMemberships = () => {
     end_date: "",
     status: "active",
     payment_status: "paid",
-    payment_method: "stripe",
+    payment_method: "other",
   });
 
   useEffect(() => {
@@ -118,7 +118,7 @@ const AdminUserMemberships = () => {
       end_date: "",
       status: "active",
       payment_status: "paid",
-      payment_method: "stripe",
+      payment_method: "other",
     });
     setEditingUserMembership(null);
   };
@@ -193,7 +193,7 @@ const AdminUserMemberships = () => {
       end_date: userMembership.end_date.split('T')[0],
       status: userMembership.status,
       payment_status: userMembership.payment_status,
-      payment_method: userMembership.payment_method || "stripe",
+      payment_method: userMembership.payment_method || "other",
     });
     setDialogOpen(true);
   };
@@ -372,6 +372,7 @@ const AdminUserMemberships = () => {
                     <SelectItem value="cash">Cash</SelectItem>
                     <SelectItem value="card">Card</SelectItem>
                     <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="staff">Staff</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
                 </Select>

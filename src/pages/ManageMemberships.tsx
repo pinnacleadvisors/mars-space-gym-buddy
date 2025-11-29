@@ -227,9 +227,7 @@ export default function ManageMemberships() {
         throw new Error("No membership selected");
       }
 
-      // Create Stripe checkout session
-      // Note: Currently create-checkout is hardcoded to use £150 membership
-      // This would need to be updated to accept membership_id parameter
+      // Create Stripe checkout session with membership_id
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -439,10 +437,12 @@ export default function ManageMemberships() {
       if (!session) throw new Error("Not authenticated");
 
       // Create new Stripe checkout session for renewal
+      // Pass the current membership_id if available
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
+        body: membership ? { membership_id: membership.id } : undefined,
       });
 
       if (error) throw error;

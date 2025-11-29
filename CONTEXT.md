@@ -478,6 +478,7 @@ Set in Supabase Dashboard → Project Settings → Edge Functions:
 - `SUPABASE_ANON_KEY` - Public anonymous key
 - `SUPABASE_SERVICE_ROLE_KEY` - Service role key (admin access)
 - `STRIPE_SECRET_KEY` - Stripe secret API key
+- `STRIPE_PRODUCT_ID` - Stripe Product ID for membership subscriptions (required for dynamic pricing)
 
 ### GitHub Secrets (for CI/CD)
 Used in `.github/workflows/github-actions-demo.yml`:
@@ -487,14 +488,22 @@ Used in `.github/workflows/github-actions-demo.yml`:
 ## 🔄 Supabase Edge Functions
 
 ### `create-checkout`
-- **Purpose**: Create Stripe checkout session for membership subscription
+- **Purpose**: Create Stripe checkout session for membership subscription with dynamic pricing
 - **Method**: POST
 - **Auth**: Requires Bearer token
+- **Request Body**: Optional `{ membership_id: string }` - If provided, uses the membership's price to create/find a Stripe price
 - **Returns**: Stripe checkout URL
-- **Price ID**: `price_1STEriRpTziRf7OxCPXLGPLw` (£150/month)
+- **Dynamic Pricing**: 
+  - If `membership_id` is provided, fetches membership from database and uses its price
+  - Searches for existing Stripe price with matching amount (in GBP, monthly recurring)
+  - Creates new Stripe price if none exists (requires `STRIPE_PRODUCT_ID` environment variable)
+  - Falls back to default `price_1STEriRpTziRf7OxCPXLGPLw` (£150/month) if no membership or price found
+- **Price Matching**: Matches prices by amount (in pence), currency (GBP), and interval (month)
+- **Price Creation**: Automatically creates new Stripe prices when needed, using membership name as nickname
 - **Success URL**: `/mars-space-gym-buddy/managememberships?success=true&session_id={CHECKOUT_SESSION_ID}` (includes base path for GitHub Pages)
 - **Cancel URL**: `/mars-space-gym-buddy/managememberships?canceled=true` (includes base path for GitHub Pages)
 - **Validation**: Server-side email validation and rate limiting (5 requests per minute per IP)
+- **Metadata**: Includes `supabase_user_id` and `membership_id` in checkout session metadata
 
 ### `check-subscription`
 - **Purpose**: Check Stripe subscription status and sync with database
@@ -832,13 +841,20 @@ To enable Google Sign In, configure the following in Supabase Dashboard:
 **Note**: Apple Sign In is saved for future implementation. See commented code in `Login.tsx` and `Register.tsx`.
 
 ### Membership Flow
-1. User clicks "Register Membership" → `create-checkout` function
-2. Redirected to Stripe checkout
-3. On success → `check-subscription` syncs with database
+1. User clicks "Start Membership" or "Renew Membership" → `create-checkout` function
+   - Frontend passes `membership_id` in request body
+   - Function fetches membership from database to get price
+2. **Dynamic Price Resolution**:
+   - Function searches for existing Stripe price matching the membership price (GBP, monthly)
+   - If found, uses existing price ID
+   - If not found, creates new Stripe price (requires `STRIPE_PRODUCT_ID` environment variable)
+   - Falls back to default £150 price if no membership or price found
+3. Redirected to Stripe checkout with correct price
+4. On success → `check-subscription` syncs with database
    - Sets `payment_method = 'stripe'` and `stripe_subscription_id` automatically
-4. `has_valid_membership()` RPC checks active membership for check-ins
-5. **Admin-created memberships**: Admins can manually create memberships with `payment_method` set to 'cash', 'staff', 'family', or 'other' (no Stripe subscription)
-6. **Cancellation**: 
+5. `has_valid_membership()` RPC checks active membership for check-ins
+6. **Admin-created memberships**: Admins can manually create memberships with `payment_method` set to 'cash', 'staff', 'family', or 'other' (no Stripe subscription)
+7. **Cancellation**: 
    - **Stripe memberships**: Cancelled via Stripe API (sets `cancel_at_period_end: true`), then updates database status to 'cancelled'
    - **Non-Stripe memberships**: Cancelled in database only (updates status to 'cancelled')
    - **Membership Type Detection**: The `cancel-subscription` function uses `payment_method` as the source of truth - if `payment_method` is explicitly set to a non-Stripe value (staff, family, cash, other), it will never attempt Stripe cancellation, even if the user's email exists in Stripe from previous transactions
@@ -2137,8 +2153,67 @@ if (qrData && qrData.action === 'reward') {
 ## 📚 Additional Resources
 
 - **Supabase Project ID**: `yggvabrltcxvkiyjixdv`
-- **Stripe Price ID**: `price_1STEriRpTziRf7OxCPXLGPLw` (£150/month)
+- **Stripe Default Price ID**: `price_1STEriRpTziRf7OxCPXLGPLw` (£150/month) - Used as fallback
+- **Stripe Product ID**: Required environment variable `STRIPE_PRODUCT_ID` for dynamic price creation
 - **Target Location**: Grinstead Rd, London SE8 5FE, United Kingdom (51.4881, -0.0300)
 - **Max Distance**: 100 meters for check-in/check-out
 - **GitHub Pages**: `https://pinnacleadvisors.github.io/mars-space-gym-buddy/`
+
+## 🔧 Dynamic Stripe Pricing Setup
+
+The application now supports dynamic Stripe pricing based on membership plan prices. Here's how to set it up:
+
+### Required Setup Steps
+
+1. **Get Your Stripe Product ID**:
+   - Go to [Stripe Dashboard](https://dashboard.stripe.com/products)
+   - Find or create a product for your gym memberships
+   - Copy the Product ID (starts with `prod_`)
+
+2. **Set Environment Variable in Supabase**:
+   - Go to Supabase Dashboard → Project Settings → Edge Functions → Secrets
+   - Add a new secret: `STRIPE_PRODUCT_ID`
+   - Value: Your Stripe Product ID (e.g., `prod_xxxxxxxxxxxxx`)
+   - Click "Save"
+
+3. **How It Works**:
+   - When a user clicks "Start Membership" with a specific membership plan, the frontend sends `membership_id` to the `create-checkout` function
+   - The function fetches the membership from the database to get its price
+   - It searches Stripe for an existing price with that exact amount (GBP, monthly recurring)
+   - If found, it uses the existing price
+   - If not found, it creates a new Stripe price using your `STRIPE_PRODUCT_ID`
+   - The checkout session uses the correct price for that membership plan
+
+4. **Fallback Behavior**:
+   - If no `membership_id` is provided, uses default £150 price
+   - If membership has no price or price is 0, uses default £150 price
+   - If `STRIPE_PRODUCT_ID` is not set, the function will attempt to find an existing product with "membership" or "gym" in the name, or use the first available product
+
+5. **Price Matching Logic**:
+   - Prices are matched by: amount (in pence), currency (GBP), and interval (month)
+   - This prevents duplicate prices for the same amount
+   - New prices are created with the membership name as the nickname for easy identification in Stripe Dashboard
+
+### Testing
+
+1. Create a membership plan in `/admin/memberships` with a different price (e.g., £99/month)
+2. Go to `/managememberships` and click "Start Membership" for that plan
+3. You should be redirected to Stripe checkout with the correct price
+4. Check Stripe Dashboard → Products → Prices to see the newly created price (if it didn't exist)
+
+### Troubleshooting
+
+- **Error: "STRIPE_PRODUCT_ID environment variable is required"**: 
+  - Make sure you've set `STRIPE_PRODUCT_ID` in Supabase Dashboard → Edge Functions → Secrets
+  - The function will try to find an existing product as fallback, but it's recommended to set this explicitly
+
+- **Prices not matching correctly**:
+  - Check that membership prices are set correctly in the database
+  - Verify the price is in pounds (not pence) - the function converts to pence automatically
+  - Check Stripe Dashboard logs for detailed error messages
+
+- **Default price always used**:
+  - Verify `membership_id` is being passed in the request body
+  - Check that the membership exists in the database and has a price set
+  - Review Edge Function logs in Supabase Dashboard for detailed information
 
