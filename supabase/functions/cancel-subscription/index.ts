@@ -138,8 +138,10 @@ serve(async (req) => {
 
         // Keep status as "active" to maintain benefits until end_date
         // The membership will naturally expire at end_date
+        // Set cancelled_at timestamp to track cancellation request for admin visibility
         const updatePayload = {
           status: "active", // Keep active until end_date
+          cancelled_at: new Date().toISOString(), // Track when cancellation was requested
           updated_at: new Date().toISOString()
         };
 

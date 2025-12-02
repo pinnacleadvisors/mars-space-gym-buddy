@@ -39,6 +39,7 @@ interface UserMembership {
   status: string;
   payment_status: string;
   payment_method: string | null;
+  cancelled_at: string | null;
   profiles?: {
     full_name: string | null;
   };
@@ -66,6 +67,7 @@ const AdminUserMemberships = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingUserMembership, setEditingUserMembership] = useState<UserMembership | null>(null);
   const { toast } = useToast();
+  const [showCancelledOnly, setShowCancelledOnly] = useState(false);
 
   const [formData, setFormData] = useState({
     user_id: "",
@@ -79,15 +81,22 @@ const AdminUserMemberships = () => {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [showCancelledOnly]);
 
   const fetchData = async () => {
     try {
+      let query = supabase
+        .from("user_memberships")
+        .select("*, profiles(full_name), memberships(name)")
+        .order("created_at", { ascending: false });
+      
+      // Filter to show only cancelled memberships if toggle is on
+      if (showCancelledOnly) {
+        query = query.not("cancelled_at", "is", null);
+      }
+      
       const [userMembershipsRes, usersRes, membershipsRes] = await Promise.all([
-        supabase
-          .from("user_memberships")
-          .select("*, profiles(full_name), memberships(name)")
-          .order("created_at", { ascending: false }),
+        query,
         supabase.from("profiles").select("id, full_name"),
         supabase.from("memberships").select("id, name, duration_days"),
       ]);
@@ -251,7 +260,14 @@ const AdminUserMemberships = () => {
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">User Memberships</h1>
-        <Dialog open={dialogOpen} onOpenChange={(open) => {
+        <div className="flex gap-2">
+          <Button
+            variant={showCancelledOnly ? "default" : "outline"}
+            onClick={() => setShowCancelledOnly(!showCancelledOnly)}
+          >
+            {showCancelledOnly ? "Show All" : "Show Cancelled Only"}
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) resetForm();
         }}>
@@ -395,11 +411,14 @@ const AdminUserMemberships = () => {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Active User Memberships</CardTitle>
+          <CardTitle>
+            {showCancelledOnly ? "Cancelled User Memberships" : "Active User Memberships"}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -412,19 +431,23 @@ const AdminUserMemberships = () => {
                 <TableHead>Status</TableHead>
                 <TableHead>Payment Status</TableHead>
                 <TableHead>Payment Method</TableHead>
+                <TableHead>Cancelled At</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {userMemberships.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground">
-                    No user memberships found
+                  <TableCell colSpan={9} className="text-center text-muted-foreground">
+                    {showCancelledOnly ? "No cancelled memberships found" : "No user memberships found"}
                   </TableCell>
                 </TableRow>
               ) : (
                 userMemberships.map((um) => (
-                  <TableRow key={um.id}>
+                  <TableRow 
+                    key={um.id}
+                    className={um.cancelled_at ? "bg-yellow-50 dark:bg-yellow-900/10" : ""}
+                  >
                     <TableCell className="font-medium">
                       {um.profiles?.full_name || "Unknown User"}
                     </TableCell>
@@ -454,6 +477,20 @@ const AdminUserMemberships = () => {
                         <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800 capitalize">
                           {um.payment_method.replace('_', ' ')}
                         </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {um.cancelled_at ? (
+                        <div className="flex flex-col">
+                          <span className="text-xs text-red-600 dark:text-red-400 font-medium">
+                            {format(new Date(um.cancelled_at), "MMM dd, yyyy")}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {format(new Date(um.cancelled_at), "HH:mm")}
+                          </span>
+                        </div>
                       ) : (
                         <span className="text-xs text-muted-foreground">-</span>
                       )}

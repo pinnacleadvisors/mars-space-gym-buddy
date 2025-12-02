@@ -301,6 +301,7 @@ mars-space-gym-buddy/
   - `payment_status` (text: 'paid', 'pending', 'failed')
   - `payment_method` (text, nullable) - Payment method: 'stripe', 'cash', 'staff', 'family', 'other', or NULL for legacy records
   - `stripe_subscription_id` (text, nullable) - Stripe subscription ID for Stripe-paid memberships. NULL for non-Stripe memberships
+  - `cancelled_at` (timestamptz, nullable) - Timestamp when user requested cancellation. Used for non-Stripe payment methods to track cancellation requests for manual processing (direct debit, invoice, cash)
   - `created_at` (timestamptz)
   - `updated_at` (timestamptz)
 - **RLS**: Users can view own, admins can manage all
@@ -308,7 +309,12 @@ mars-space-gym-buddy/
   - Stripe memberships: `payment_method = 'stripe'` and `stripe_subscription_id` contains the Stripe subscription ID
   - Admin-created memberships: `payment_method` set to 'cash', 'staff', 'family', or 'other' (no `stripe_subscription_id`)
   - Legacy records may have NULL `payment_method` (before migration)
-- **Migration**: Run `ADD_PAYMENT_METHOD_TO_USER_MEMBERSHIPS.sql` to add `payment_method` and `stripe_subscription_id` columns
+- **Cancellation Tracking**: 
+  - For Stripe memberships: Cancellation handled automatically via Stripe API (`cancel_at_period_end`)
+  - For non-Stripe memberships: `cancelled_at` timestamp is set when user cancels, allowing admins to see cancellation requests and manually process (stop direct debit, skip invoice, etc.)
+- **Migrations**: 
+  - Run `ADD_PAYMENT_METHOD_TO_USER_MEMBERSHIPS.sql` to add `payment_method` and `stripe_subscription_id` columns
+  - Run `ADD_CANCELLED_AT_TO_USER_MEMBERSHIPS.sql` to add `cancelled_at` column
 
 #### `check_ins`
 - **Purpose**: Gym visit tracking
@@ -524,13 +530,15 @@ Used in `.github/workflows/github-actions-demo.yml`:
     - Only treats as Stripe if `payment_method = 'stripe'` OR `stripe_subscription_id` is present
     - Prevents non-Stripe memberships from entering Stripe cancellation path even if user's email exists in Stripe
   - **For Stripe memberships**: 
-    - Sets `cancel_at_period_end: true` in Stripe
-    - Updates status to 'cancelled' in database
-    - Handles cases where Stripe customer exists but no active subscription (updates database only)
-  - **For non-Stripe memberships** (cash, staff, family, other): 
-    - Updates status to 'cancelled' in database only
+    - Sets `cancel_at_period_end: true` in Stripe (stops recurring payments at period end)
+    - Keeps status as 'active' until period end (membership benefits continue)
+    - Stripe handles the actual cancellation at period end
+  - **For non-Stripe memberships** (cash, staff, family, other, direct debit, invoice): 
+    - Sets `cancelled_at` timestamp to track cancellation request
+    - Keeps status as 'active' until `end_date` (membership benefits continue)
     - Skips all Stripe API calls
     - Returns success immediately after database update
+    - **Admin Visibility**: `cancelled_at` timestamp allows admins to see cancellation requests in `/admin/usermemberships` and manually process (stop direct debit, skip invoice, etc.)
   - **Error Handling**: Comprehensive logging and error messages for debugging
 
 ## 🛣️ Application Routes
@@ -855,8 +863,8 @@ To enable Google Sign In, configure the following in Supabase Dashboard:
 5. `has_valid_membership()` RPC checks active membership for check-ins
 6. **Admin-created memberships**: Admins can manually create memberships with `payment_method` set to 'cash', 'staff', 'family', or 'other' (no Stripe subscription)
 7. **Cancellation**: 
-   - **Stripe memberships**: Cancelled via Stripe API (sets `cancel_at_period_end: true`), then updates database status to 'cancelled'
-   - **Non-Stripe memberships**: Cancelled in database only (updates status to 'cancelled')
+   - **Stripe memberships**: Cancelled via Stripe API (sets `cancel_at_period_end: true`), which stops recurring payments at period end. Membership remains active until period end.
+   - **Non-Stripe memberships**: When user cancels, `cancelled_at` timestamp is set in database. Membership remains active until `end_date`. Admins can view cancelled memberships in `/admin/usermemberships` to manually process (stop direct debit, skip invoice, etc.)
    - **Membership Type Detection**: The `cancel-subscription` function uses `payment_method` as the source of truth - if `payment_method` is explicitly set to a non-Stripe value (staff, family, cash, other), it will never attempt Stripe cancellation, even if the user's email exists in Stripe from previous transactions
 
 ### Check-in/Check-out Flow
@@ -1311,6 +1319,32 @@ The AdminManageMemberships page (`src/pages/AdminManageMemberships.tsx`) include
 - **Form Validation**: Comprehensive validation with helpful error messages
 
 **Note**: Membership assignment to users is handled via the AdminUserMemberships page (`/admin/usermemberships`), which provides full CRUD functionality for user memberships.
+
+### Admin User Memberships Management Features
+The AdminUserMemberships page (`src/pages/AdminUserMemberships.tsx`) includes:
+- **User Membership CRUD**:
+  - Create new user memberships with payment method selection
+  - Edit existing user memberships (dates, status, payment method)
+  - Delete user memberships
+  - Auto-calculates end date (1 month after start date for monthly recurring)
+- **Cancellation Tracking**:
+  - **Cancelled At Column**: Shows timestamp when user requested cancellation (for non-Stripe payment methods)
+  - **Filter Toggle**: "Show Cancelled Only" button to filter and view only cancelled memberships
+  - **Visual Highlighting**: Cancelled memberships are highlighted with yellow background
+  - **Admin Workflow**: Allows admins to see cancellation requests and manually process:
+    - Stop direct debit payments
+    - Skip invoice generation
+    - Avoid requesting cash payment next month
+- **Payment Method Display**:
+  - Shows payment method for each membership (Stripe, Cash, Card, Bank Transfer, Staff, Other)
+  - Helps identify which memberships require manual payment processing
+- **User Membership Table**:
+  - Displays all user memberships with user name, membership plan, dates, status, payment status, and payment method
+  - Shows cancellation timestamp when available
+  - Edit and delete actions for each membership
+- **Real-time Data**: Fetches latest user memberships, users, and membership plans
+- **Loading States**: Loading spinner during data fetch
+- **Error Handling**: Toast notifications for all operations
 
 ### Admin Deals & Referrals Management Features
 The AdminManageDeals page (`src/pages/AdminManageDeals.tsx`) includes:
