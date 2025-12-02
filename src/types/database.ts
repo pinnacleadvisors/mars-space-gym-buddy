@@ -384,6 +384,7 @@ export type Database = {
       }
       user_memberships: {
         Row: {
+          cancelled_at: string | null
           created_at: string | null
           end_date: string
           id: string
@@ -397,6 +398,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          cancelled_at?: string | null
           created_at?: string | null
           end_date: string
           id?: string
@@ -410,6 +412,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          cancelled_at?: string | null
           created_at?: string | null
           end_date?: string
           id?: string
