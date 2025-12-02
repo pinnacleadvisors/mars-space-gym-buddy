@@ -3,8 +3,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 interface UserMembership {
@@ -36,6 +38,10 @@ export default function ManageMemberships() {
   const [actionLoading, setActionLoading] = useState(false);
   const [isCancellationRequested, setIsCancellationRequested] = useState(false);
   const [remainingDays, setRemainingDays] = useState<number | null>(null);
+  const [couponCode, setCouponCode] = useState("");
+  const [couponValidating, setCouponValidating] = useState(false);
+  const [couponValid, setCouponValid] = useState<boolean | null>(null);
+  const [couponDetails, setCouponDetails] = useState<{type: string; value: number; description: string | null} | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const fetchingRef = useRef(false);
@@ -371,12 +377,77 @@ export default function ManageMemberships() {
     }
   };
 
+  const validateCoupon = async (code: string) => {
+    if (!code || code.trim() === "") {
+      setCouponValid(null);
+      setCouponDetails(null);
+      return;
+    }
+
+    setCouponValidating(true);
+    try {
+      const { data, error } = await supabase.rpc("is_coupon_valid", {
+        _code: code.toUpperCase().trim(),
+      });
+
+      if (error) throw error;
+
+      if (data) {
+        // Fetch coupon details
+        const { data: couponData, error: couponError } = await supabase
+          .from("coupon_codes")
+          .select("type, value, description")
+          .eq("code", code.toUpperCase().trim())
+          .single();
+
+        if (couponError) throw couponError;
+
+        setCouponValid(true);
+        setCouponDetails(couponData);
+      } else {
+        setCouponValid(false);
+        setCouponDetails(null);
+      }
+    } catch (error: any) {
+      setCouponValid(false);
+      setCouponDetails(null);
+      console.error("Error validating coupon:", error);
+    } finally {
+      setCouponValidating(false);
+    }
+  };
+
+  useEffect(() => {
+    if (couponCode.trim() === "") {
+      setCouponValid(null);
+      setCouponDetails(null);
+      return;
+    }
+
+    const timeoutId = setTimeout(() => {
+      validateCoupon(couponCode);
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [couponCode]);
+
   const handleRegister = async (selectedMembershipId?: string) => {
     setActionLoading(true);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
+
+      // Validate coupon if provided
+      if (couponCode && couponCode.trim() !== "") {
+        const { data: isValid } = await supabase.rpc("is_coupon_valid", {
+          _code: couponCode.toUpperCase().trim(),
+        });
+
+        if (!isValid) {
+          throw new Error("Invalid coupon code. Please check and try again.");
+        }
+      }
 
       // Determine which membership to use
       const membershipToUse = selectedMembershipId 
@@ -387,12 +458,15 @@ export default function ManageMemberships() {
         throw new Error("No membership selected");
       }
 
-      // Create Stripe checkout session with membership_id
+      // Create Stripe checkout session with membership_id and coupon_code
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: membershipToUse ? { membership_id: membershipToUse.id } : undefined,
+        body: {
+          membership_id: membershipToUse.id,
+          coupon_code: couponCode && couponCode.trim() !== "" ? couponCode.toUpperCase().trim() : null,
+        },
       });
 
       if (error) throw error;
@@ -662,13 +736,27 @@ export default function ManageMemberships() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
+      // Validate coupon if provided
+      if (couponCode && couponCode.trim() !== "") {
+        const { data: isValid } = await supabase.rpc("is_coupon_valid", {
+          _code: couponCode.toUpperCase().trim(),
+        });
+
+        if (!isValid) {
+          throw new Error("Invalid coupon code. Please check and try again.");
+        }
+      }
+
       // Create new Stripe checkout session for renewal
-      // Pass the current membership_id if available
+      // Pass the current membership_id and coupon_code if available
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
-        body: membership ? { membership_id: membership.id } : undefined,
+        body: {
+          membership_id: membership?.id,
+          coupon_code: couponCode && couponCode.trim() !== "" ? couponCode.toUpperCase().trim() : null,
+        },
       });
 
       if (error) throw error;
@@ -788,6 +876,54 @@ export default function ManageMemberships() {
           <h2 className="text-2xl font-semibold">
             {showChangePlan ? "Change Your Plan" : "Available Membership Plans"}
           </h2>
+          
+          {/* Coupon Code Input */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Have a Coupon Code?</CardTitle>
+              <CardDescription>
+                Enter your discount or referral code below
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="coupon-code">Coupon Code</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="coupon-code"
+                    placeholder="Enter coupon code"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                    className="flex-1"
+                    disabled={actionLoading}
+                  />
+                  {couponValidating && (
+                    <Loader2 className="h-4 w-4 animate-spin self-center" />
+                  )}
+                  {couponValid === true && !couponValidating && (
+                    <CheckCircle2 className="h-5 w-5 text-green-500 self-center" />
+                  )}
+                  {couponValid === false && !couponValidating && (
+                    <XCircle className="h-5 w-5 text-red-500 self-center" />
+                  )}
+                </div>
+                {couponValid === true && couponDetails && (
+                  <p className="text-sm text-green-600 dark:text-green-400">
+                    ✓ Valid coupon: {couponDetails.type === "percentage" 
+                      ? `${couponDetails.value}% off` 
+                      : `£${couponDetails.value.toFixed(2)} off`}
+                    {couponDetails.description && ` - ${couponDetails.description}`}
+                  </p>
+                )}
+                {couponValid === false && couponCode.trim() !== "" && (
+                  <p className="text-sm text-red-600 dark:text-red-400">
+                    Invalid or expired coupon code
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {availableMemberships.map((plan) => {
               const isCurrentPlan = userMembership?.membership_id === plan.id;
@@ -835,19 +971,67 @@ export default function ManageMemberships() {
       {/* Current Membership Plan - Show only for Stripe memberships when user has a membership and change plan is not toggled */}
       {userMembership && membership && !showChangePlan && 
        (userMembership.payment_method === "stripe" || userMembership.stripe_subscription_id) && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{membership.name}</CardTitle>
-            <CardDescription>
-              {membership.price ? `£${membership.price}` : "Free"} {membership.price ? "per month" : ""} • {membership.access_level || "Standard"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-muted-foreground">
-              Duration: {membership.duration_days} days
-            </p>
+        <>
+          {/* Coupon Code Input for Renewal */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Have a Coupon Code?</CardTitle>
+              <CardDescription>
+                Enter your discount or referral code below
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Label htmlFor="coupon-code-renewal">Coupon Code</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="coupon-code-renewal"
+                    placeholder="Enter coupon code"
+                    value={couponCode}
+                    onChange={(e) => setCouponCode(e.target.value)}
+                    className="flex-1"
+                    disabled={actionLoading}
+                  />
+                  {couponValidating && (
+                    <Loader2 className="h-4 w-4 animate-spin self-center" />
+                  )}
+                  {couponValid === true && !couponValidating && (
+                    <CheckCircle2 className="h-5 w-5 text-green-500 self-center" />
+                  )}
+                  {couponValid === false && !couponValidating && (
+                    <XCircle className="h-5 w-5 text-red-500 self-center" />
+                  )}
+                </div>
+                {couponValid === true && couponDetails && (
+                  <p className="text-sm text-green-600 dark:text-green-400">
+                    ✓ Valid coupon: {couponDetails.type === "percentage" 
+                      ? `${couponDetails.value}% off` 
+                      : `£${couponDetails.value.toFixed(2)} off`}
+                    {couponDetails.description && ` - ${couponDetails.description}`}
+                  </p>
+                )}
+                {couponValid === false && couponCode.trim() !== "" && (
+                  <p className="text-sm text-red-600 dark:text-red-400">
+                    Invalid or expired coupon code
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-            <div className="flex gap-3 flex-wrap">
+          <Card>
+            <CardHeader>
+              <CardTitle>{membership.name}</CardTitle>
+              <CardDescription>
+                {membership.price ? `£${membership.price}` : "Free"} {membership.price ? "per month" : ""} • {membership.access_level || "Standard"}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-muted-foreground">
+                Duration: {membership.duration_days} days
+              </p>
+
+              <div className="flex gap-3 flex-wrap">
               {/* Show renew and cancel options if user has active membership for this specific membership */}
               {hasActiveMembership && (
                 <>
@@ -878,6 +1062,7 @@ export default function ManageMemberships() {
             </div>
           </CardContent>
         </Card>
+        </>
       )}
 
       {/* No memberships available */}

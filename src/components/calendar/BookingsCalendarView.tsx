@@ -15,8 +15,8 @@ interface BookingsCalendarViewProps {
   onDateClick?: (date: Date) => void;
   onBookingClick?: (booking: BookingWithDetails) => void;
   selectedDate?: Date | null;
-  viewMode?: "weekly" | "monthly";
-  onViewModeChange?: (mode: "weekly" | "monthly") => void;
+  viewMode?: "daily" | "weekly" | "monthly";
+  onViewModeChange?: (mode: "daily" | "weekly" | "monthly") => void;
 }
 
 export const BookingsCalendarView = ({
@@ -29,6 +29,8 @@ export const BookingsCalendarView = ({
 }: BookingsCalendarViewProps) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [currentDay, setCurrentDay] = useState(new Date());
+  const [dayViewMode, setDayViewMode] = useState<"day" | false>(false);
 
   // Filter bookings that have valid class_sessions
   const validBookings = useMemo(() => {
@@ -72,7 +74,12 @@ export const BookingsCalendarView = ({
   };
 
   const handleDateClick = (date: Date) => {
-    onDateClick?.(date);
+    if (viewMode === "daily") {
+      setCurrentDay(date);
+      setDayViewMode("day");
+    } else {
+      onDateClick?.(date);
+    }
   };
 
   const handlePreviousWeek = () => {
@@ -82,6 +89,130 @@ export const BookingsCalendarView = ({
   const handleNextWeek = () => {
     setCurrentWeek(addWeeks(currentWeek, 1));
   };
+
+  // Day view
+  if (dayViewMode === "day" && viewMode === "daily") {
+    const dayBookings = getBookingsForDate(currentDay);
+    return (
+      <DayView
+        date={currentDay}
+        bookings={dayBookings}
+        onBookingClick={onBookingClick}
+        onBack={() => setDayViewMode(false)}
+        onDateChange={(date) => {
+          setCurrentDay(date);
+          setCurrentWeek(date);
+          setCurrentMonth(date);
+        }}
+      />
+    );
+  }
+
+  // Daily view (shows week with day selection)
+  if (viewMode === "daily") {
+    const weekStart = startOfWeek(currentDay);
+    const weekEnd = endOfWeek(currentDay);
+    const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+    return (
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-2xl font-bold">
+              {format(currentDay, "EEEE, MMMM d, yyyy")}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <CalendarViewToggle
+                viewMode={viewMode}
+                onViewModeChange={(mode) => {
+                  onViewModeChange?.(mode);
+                  if (mode !== "daily") {
+                    setDayViewMode(false);
+                  }
+                }}
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  const prevDay = new Date(currentDay);
+                  prevDay.setDate(prevDay.getDate() - 1);
+                  setCurrentDay(prevDay);
+                }}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => {
+                  const nextDay = new Date(currentDay);
+                  nextDay.setDate(nextDay.getDate() + 1);
+                  setCurrentDay(nextDay);
+                }}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const today = new Date();
+                  setCurrentDay(today);
+                }}
+              >
+                Today
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Week strip */}
+            <div className="flex gap-2">
+              {weekDays.map((day) => {
+                const isSelected = isSameDay(day, currentDay);
+                const isToday = isSameDay(day, new Date());
+                return (
+                  <button
+                    key={day.toISOString()}
+                    onClick={() => setCurrentDay(day)}
+                    className={cn(
+                      "flex-1 p-3 rounded-lg border transition-colors text-center",
+                      isSelected && "bg-primary text-primary-foreground border-primary",
+                      !isSelected && "hover:bg-accent",
+                      isToday && !isSelected && "border-primary"
+                    )}
+                  >
+                    <div className="text-xs text-muted-foreground mb-1">
+                      {format(day, "EEE")}
+                    </div>
+                    <div className="text-lg font-semibold">
+                      {format(day, "d")}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Day timeline */}
+            <div className="mt-6">
+              <button
+                onClick={() => setDayViewMode("day")}
+                className="w-full p-4 rounded-lg border hover:bg-accent transition-colors text-left"
+              >
+                <div className="text-sm font-semibold mb-2">
+                  Click to view detailed day schedule
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {getBookingsForDate(currentDay).length} booking{getBookingsForDate(currentDay).length !== 1 ? "s" : ""} on this day
+                </div>
+              </button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   // Weekly view
   if (viewMode === "weekly") {
@@ -99,7 +230,12 @@ export const BookingsCalendarView = ({
             <div className="flex items-center gap-2">
               <CalendarViewToggle
                 viewMode={viewMode}
-                onViewModeChange={(mode) => onViewModeChange?.(mode)}
+                onViewModeChange={(mode) => {
+                  onViewModeChange?.(mode);
+                  if (mode === "daily") {
+                    setCurrentDay(new Date());
+                  }
+                }}
               />
               <Button
                 variant="outline"

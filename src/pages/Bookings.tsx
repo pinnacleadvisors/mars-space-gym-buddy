@@ -32,7 +32,7 @@ import { BookingsCalendarView } from "@/components/calendar/BookingsCalendarView
 
 const Bookings = () => {
   const [viewMode, setViewMode] = useState<"list" | "calendar">("calendar");
-  const [calendarViewMode, setCalendarViewMode] = useState<"weekly" | "monthly">("weekly");
+  const [calendarViewMode, setCalendarViewMode] = useState<"daily" | "weekly" | "monthly">("weekly");
   const [selectedBooking, setSelectedBooking] = useState<BookingWithDetails | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);

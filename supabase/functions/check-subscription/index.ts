@@ -82,8 +82,47 @@ serve(async (req) => {
     
     logStep("Active subscription found", { 
       subscriptionId: subscription.id, 
-      endDate: currentPeriodEnd.toISOString() 
+      endDate: currentPeriodEnd.toISOString(),
+      metadata: subscription.metadata
     });
+
+    // Track coupon usage if coupon was used
+    const couponId = subscription.metadata?.coupon_id;
+    if (couponId) {
+      try {
+        // Check if coupon usage already recorded for this subscription
+        const { data: existingUsage } = await supabaseClient
+          .from("coupon_usage")
+          .select("id")
+          .eq("coupon_id", couponId)
+          .eq("user_id", user.id)
+          .eq("order_id", subscription.id)
+          .maybeSingle();
+
+        if (!existingUsage) {
+          // Record coupon usage
+          const { error: usageError } = await supabaseClient
+            .from("coupon_usage")
+            .insert({
+              coupon_id: couponId,
+              user_id: user.id,
+              order_id: subscription.id,
+            });
+
+          if (usageError) {
+            logStep("Error recording coupon usage", { error: usageError.message });
+            // Don't throw - coupon usage tracking failure shouldn't break subscription sync
+          } else {
+            logStep("Coupon usage recorded", { couponId, subscriptionId: subscription.id });
+          }
+        } else {
+          logStep("Coupon usage already recorded", { couponId, subscriptionId: subscription.id });
+        }
+      } catch (couponError) {
+        logStep("Error in coupon usage tracking", { error: couponError });
+        // Don't throw - coupon usage tracking failure shouldn't break subscription sync
+      }
+    }
 
     // Check for existing user_membership first
     const { data: existingMembership } = await supabaseClient

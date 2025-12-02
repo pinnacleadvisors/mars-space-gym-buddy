@@ -90,15 +90,19 @@ serve(async (req) => {
     
     logStep("User authenticated", { userId: user.id, email: user.email });
 
-    // Parse request body to get membership_id
+    // Parse request body to get membership_id and coupon_code
     let membershipId: string | null = null;
     let membershipPrice: number | null = null;
     let membershipName: string | null = null;
+    let couponCode: string | null = null;
+    let couponId: string | null = null;
+    let discountAmount: number = 0;
     
     try {
       const body = await req.json();
       membershipId = body.membership_id || null;
-      logStep("Request body parsed", { membershipId });
+      couponCode = body.coupon_code || null;
+      logStep("Request body parsed", { membershipId, hasCouponCode: !!couponCode });
     } catch (parseError) {
       // Body might be empty or invalid JSON, that's okay - we'll use default price
       logStep("No request body or invalid JSON, will use default price");
@@ -128,6 +132,66 @@ serve(async (req) => {
       } else {
         logStep("Membership not found, will use default price", { membershipId });
       }
+    }
+
+    // Validate and apply coupon code if provided
+    if (couponCode && couponCode.trim() !== "" && membershipPrice) {
+      const normalizedCouponCode = couponCode.toUpperCase().trim();
+      logStep("Validating coupon code", { code: normalizedCouponCode });
+
+      // Validate coupon using database function
+      const { data: isValid, error: validationError } = await supabaseClient
+        .rpc("is_coupon_valid", { _code: normalizedCouponCode });
+
+      if (validationError) {
+        logStep("Error validating coupon", { error: validationError.message });
+        throw new Error(`Failed to validate coupon code: ${validationError.message}`);
+      }
+
+      if (!isValid) {
+        logStep("Invalid coupon code", { code: normalizedCouponCode });
+        throw new Error("Invalid or expired coupon code");
+      }
+
+      // Fetch coupon details
+      const { data: couponData, error: couponError } = await supabaseClient
+        .from("coupon_codes")
+        .select("id, type, value, description")
+        .eq("code", normalizedCouponCode)
+        .single();
+
+      if (couponError || !couponData) {
+        logStep("Error fetching coupon details", { error: couponError?.message });
+        throw new Error("Coupon code not found");
+      }
+
+      couponId = couponData.id;
+
+      // Calculate discount
+      if (couponData.type === "percentage") {
+        discountAmount = membershipPrice * (couponData.value / 100);
+        logStep("Percentage discount calculated", { 
+          percentage: couponData.value, 
+          discountAmount,
+          originalPrice: membershipPrice
+        });
+      } else {
+        // money_off type
+        discountAmount = couponData.value;
+        logStep("Fixed amount discount calculated", { 
+          discountAmount,
+          originalPrice: membershipPrice
+        });
+      }
+
+      // Apply discount (ensure price doesn't go below 0)
+      membershipPrice = Math.max(0, membershipPrice - discountAmount);
+      logStep("Price after discount", { 
+        originalPrice: membershipPrice + discountAmount,
+        discountAmount,
+        finalPrice: membershipPrice,
+        couponId
+      });
     }
 
     const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { 
@@ -268,9 +332,21 @@ serve(async (req) => {
       mode: "subscription",
       success_url: `${origin}${basePath}/managememberships?success=true&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}${basePath}/managememberships?canceled=true`,
+      subscription_data: couponId ? {
+        metadata: {
+          coupon_id: couponId,
+          coupon_code: couponCode || "",
+        }
+      } : undefined,
       metadata: {
         supabase_user_id: user.id,
         membership_id: membershipId || "",
+        coupon_id: couponId || "",
+        coupon_code: couponCode || "",
+        original_price: membershipPrice && discountAmount > 0 
+          ? String((membershipPrice + discountAmount) * 100) 
+          : "",
+        discount_amount: discountAmount > 0 ? String(discountAmount * 100) : "",
       }
     });
 

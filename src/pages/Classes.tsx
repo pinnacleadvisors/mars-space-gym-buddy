@@ -76,7 +76,7 @@ const Classes = () => {
   const [showBookingDialog, setShowBookingDialog] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "calendar">("calendar");
-  const [calendarViewMode, setCalendarViewMode] = useState<"weekly" | "monthly">("weekly");
+  const [calendarViewMode, setCalendarViewMode] = useState<"daily" | "weekly" | "monthly">("weekly");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   
   const { toast } = useToast();
