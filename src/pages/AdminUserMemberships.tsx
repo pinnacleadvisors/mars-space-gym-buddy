@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { format } from "date-fns";
+import { format, addMonths } from "date-fns";
 
 interface UserMembership {
   id: string;
@@ -123,25 +123,38 @@ const AdminUserMemberships = () => {
     setEditingUserMembership(null);
   };
 
-  const calculateEndDate = (startDate: string, membershipId: string) => {
-    const membership = memberships.find(m => m.id === membershipId);
-    if (!membership?.duration_days) return "";
+  const calculateEndDate = (startDate: string) => {
+    if (!startDate) return "";
     
+    // For monthly recurring memberships, add 1 month to start date
+    // This handles months with different lengths correctly
+    // e.g., Feb 1 → Mar 1, Jan 31 → Feb 28/29 or Mar 1
     const start = new Date(startDate);
-    const end = new Date(start);
-    end.setDate(end.getDate() + membership.duration_days);
+    const end = addMonths(start, 1);
     return end.toISOString().split('T')[0];
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Ensure end_date is calculated if not already set
+    const calculatedEndDate = formData.end_date || calculateEndDate(formData.start_date);
+    
+    if (!calculatedEndDate) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select a start date",
+      });
+      return;
+    }
+
     try {
       const userMembershipData = {
         user_id: formData.user_id,
         membership_id: formData.membership_id,
         start_date: formData.start_date,
-        end_date: formData.end_date,
+        end_date: calculatedEndDate,
         status: formData.status,
         payment_status: formData.payment_status,
         payment_method: formData.payment_method,
@@ -186,11 +199,13 @@ const AdminUserMemberships = () => {
 
   const handleEdit = (userMembership: UserMembership) => {
     setEditingUserMembership(userMembership);
+    const startDate = userMembership.start_date.split('T')[0];
     setFormData({
       user_id: userMembership.user_id,
       membership_id: userMembership.membership_id,
-      start_date: userMembership.start_date.split('T')[0],
-      end_date: userMembership.end_date.split('T')[0],
+      start_date: startDate,
+      // Auto-calculate end date based on start date (1 month after)
+      end_date: calculateEndDate(startDate),
       status: userMembership.status,
       payment_status: userMembership.payment_status,
       payment_method: userMembership.payment_method || "other",
@@ -278,8 +293,9 @@ const AdminUserMemberships = () => {
                   value={formData.membership_id}
                   onValueChange={(value) => {
                     const newFormData = { ...formData, membership_id: value };
+                    // Auto-calculate end date if start date is set
                     if (formData.start_date) {
-                      newFormData.end_date = calculateEndDate(formData.start_date, value);
+                      newFormData.end_date = calculateEndDate(formData.start_date);
                     }
                     setFormData(newFormData);
                   }}
@@ -305,23 +321,19 @@ const AdminUserMemberships = () => {
                   value={formData.start_date}
                   onChange={(e) => {
                     const newFormData = { ...formData, start_date: e.target.value };
-                    if (formData.membership_id) {
-                      newFormData.end_date = calculateEndDate(e.target.value, formData.membership_id);
+                    // Auto-calculate end date (1 month after start date for monthly recurring)
+                    if (e.target.value) {
+                      newFormData.end_date = calculateEndDate(e.target.value);
+                    } else {
+                      newFormData.end_date = "";
                     }
                     setFormData(newFormData);
                   }}
                   required
                 />
-              </div>
-              <div>
-                <Label htmlFor="end_date">End Date *</Label>
-                <Input
-                  id="end_date"
-                  type="date"
-                  value={formData.end_date}
-                  onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                  required
-                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  End date will be automatically set to 1 month after start date
+                </p>
               </div>
               <div>
                 <Label htmlFor="status">Status *</Label>

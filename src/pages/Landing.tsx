@@ -20,8 +20,8 @@ const Landing = () => {
         {/* Logo near the top */}
         <div className="flex-shrink-0 mt-8 md:mt-12">
           <img 
-            src={`${import.meta.env.BASE_URL}mars-space-logo.png`}
-            alt="MARS Space" 
+            src={`${import.meta.env.BASE_URL}earth-space-logo-9.webp`}
+            alt="Earth Space" 
             className="h-16 md:h-20 lg:h-24 w-auto mx-auto"
           />
           </div>
@@ -30,7 +30,7 @@ const Landing = () => {
         <div className="flex-1 flex flex-col items-center justify-center text-center max-w-3xl mx-auto space-y-8 md:space-y-12">
           {/* Large serif headline */}
           <h1 className="text-5xl md:text-6xl lg:text-7xl font-serif font-bold text-white leading-tight tracking-tight">
-            Welcome to Mars Space
+            Welcome to Earth Space
           </h1>
           
           {/* Body text paragraph */}
@@ -52,7 +52,7 @@ const Landing = () => {
               variant="outline" 
             className="flex-1 h-12 md:h-14 rounded-full border-2 border-white text-white font-semibold text-base md:text-lg hover:bg-white/10 transition-all backdrop-blur-sm"
             >
-            JOIN MARS SPACE
+            JOIN EARTH SPACE
             </Button>
           </div>
         </div>

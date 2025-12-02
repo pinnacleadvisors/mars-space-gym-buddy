@@ -22,12 +22,12 @@ export function TopBar() {
       <div className="flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="md:hidden" />
-          <h1 
-            className="text-xl font-bold text-primary cursor-pointer hover:opacity-80 transition-opacity"
+          <img 
+            src={`${import.meta.env.BASE_URL}earth-space-logo-9.webp`}
+            alt="Earth Space" 
+            className="h-8 md:h-10 w-auto cursor-pointer hover:opacity-80 transition-opacity"
             onClick={() => navigate("/dashboard")}
-          >
-            marsspace
-          </h1>
+          />
         </div>
 
         <div className="flex items-center gap-3">

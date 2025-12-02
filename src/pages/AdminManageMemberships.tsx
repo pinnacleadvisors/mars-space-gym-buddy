@@ -74,11 +74,6 @@ const membershipSchema = z.object({
     const num = parseFloat(val);
     return !isNaN(num) && num >= 0;
   }, "Price must be a valid number"),
-  duration_days: z.string().refine((val) => {
-    if (!val) return true; // Optional
-    const num = parseInt(val);
-    return !isNaN(num) && num > 0;
-  }, "Duration must be a positive number"),
   access_level: z.string().optional(),
 });
 
@@ -126,7 +121,6 @@ const AdminManageMemberships = () => {
     defaultValues: {
       name: "",
       price: "",
-      duration_days: "",
       access_level: "",
     },
   });
@@ -234,7 +228,6 @@ const AdminManageMemberships = () => {
     form.reset({
       name: "",
       price: "",
-      duration_days: "",
       access_level: "",
     });
     setEditingMembership(null);
@@ -245,7 +238,10 @@ const AdminManageMemberships = () => {
       const membershipData = {
         name: data.name,
         price: data.price ? parseFloat(data.price) : null,
-        duration_days: data.duration_days ? parseInt(data.duration_days) : null,
+        // New memberships default to 30 days (1 month) for monthly recurring
+        duration_days: editingMembership 
+          ? editingMembership.duration_days // Preserve existing duration when editing
+          : 30, // Default to 30 days (1 month) for new memberships
         access_level: data.access_level || null,
       };
 
@@ -285,7 +281,6 @@ const AdminManageMemberships = () => {
     form.reset({
       name: membership.name,
       price: membership.price?.toString() || "",
-      duration_days: membership.duration_days?.toString() || "",
       access_level: membership.access_level || "",
     });
     setDialogOpen(true);
@@ -411,27 +406,7 @@ const AdminManageMemberships = () => {
                           />
                         </FormControl>
                         <FormDescription>
-                          Monthly or one-time price
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="duration_days"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Duration (Days)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            placeholder="e.g., 30"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Number of days the membership is valid
+                          Monthly recurring price (membership valid for 1 month until cancelled)
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
