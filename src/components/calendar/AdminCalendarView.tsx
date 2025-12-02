@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, parseISO } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, parseISO, addWeeks, subWeeks } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { CalendarViewToggle } from "./CalendarViewToggle";
 import {
   Dialog,
   DialogContent,
@@ -62,7 +63,9 @@ export const AdminCalendarView = ({
   onDateClick,
 }: AdminCalendarViewProps) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [viewMode, setViewMode] = useState<"month" | "day">("month");
+  const [currentWeek, setCurrentWeek] = useState(new Date());
+  const [viewMode, setViewMode] = useState<"weekly" | "monthly">("weekly");
+  const [dayViewMode, setDayViewMode] = useState<"day" | false>(false);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -114,8 +117,16 @@ export const AdminCalendarView = ({
 
   const handleDateClick = (date: Date) => {
     setSelectedDay(date);
-    setViewMode("day");
+    setDayViewMode("day");
     onDateClick?.(date);
+  };
+
+  const handlePreviousWeek = () => {
+    setCurrentWeek(subWeeks(currentWeek, 1));
+  };
+
+  const handleNextWeek = () => {
+    setCurrentWeek(addWeeks(currentWeek, 1));
   };
 
   const handleAddSession = () => {
@@ -360,7 +371,7 @@ export const AdminCalendarView = ({
   );
 
   // Day view
-  if (viewMode === "day" && selectedDay) {
+  if (dayViewMode === "day" && selectedDay) {
     const daySessions = getSessionsForDate(selectedDay);
     return (
       <>
@@ -368,10 +379,11 @@ export const AdminCalendarView = ({
           date={selectedDay}
           sessions={daySessions}
           classes={classes}
-          onBack={() => setViewMode("month")}
+          onBack={() => setDayViewMode(false)}
           onDateChange={(date) => {
             setSelectedDay(date);
             setCurrentMonth(startOfMonth(date));
+            setCurrentWeek(date);
           }}
           onAddSession={handleAddSession}
           onEditSession={handleEditSession}
@@ -382,7 +394,119 @@ export const AdminCalendarView = ({
     );
   }
 
-  // Month view
+  // Weekly view
+  if (viewMode === "weekly") {
+    const weekStart = startOfWeek(currentWeek);
+    const weekEnd = endOfWeek(currentWeek);
+    const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+    return (
+      <>
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-2xl font-bold">
+                {format(weekStart, "MMM d")} - {format(weekEnd, "MMM d, yyyy")}
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <CalendarViewToggle
+                  viewMode={viewMode}
+                  onViewModeChange={(mode) => setViewMode(mode)}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handlePreviousWeek}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleNextWeek}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const today = new Date();
+                    setCurrentWeek(today);
+                  }}
+                >
+                  Today
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Weekday headers */}
+              <div className="grid grid-cols-7 gap-1">
+                {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                  <div
+                    key={day}
+                    className="text-center text-sm font-medium text-muted-foreground py-2"
+                  >
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              {/* Horizontal separator */}
+              <div className="border-t border-border" />
+
+              {/* Weekly grid */}
+              <div className="grid grid-cols-7 gap-1">
+                {weekDays.map((day, dayIndex) => {
+                  const daySessions = getSessionsForDate(day);
+                  const isToday = isSameDay(day, new Date());
+                  const isSelected = selectedDay && isSameDay(day, selectedDay);
+
+                  return (
+                    <div
+                      key={dayIndex}
+                      className={cn(
+                        "min-h-[200px] p-2 cursor-pointer transition-colors border rounded-lg",
+                        isToday && "bg-primary/5 border-primary",
+                        isSelected && !isToday && "bg-primary/10 border-primary/50",
+                        "hover:bg-accent"
+                      )}
+                      onClick={() => handleDateClick(day)}
+                    >
+                      <div
+                        className={cn(
+                          "text-sm font-semibold mb-2",
+                          isToday && "text-primary",
+                          isSelected && "text-primary"
+                        )}
+                      >
+                        {format(day, "d")}
+                      </div>
+                      <div className="space-y-1">
+                        {daySessions.map((session) => (
+                          <Badge
+                            key={session.id}
+                            variant="secondary"
+                            className="w-full text-xs truncate"
+                          >
+                            {format(parseISO(session.start_time), "h:mm a")} - {session.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        {renderDialogs()}
+      </>
+    );
+  }
+
+  // Monthly view
   return (
     <>
       <Card>
@@ -392,6 +516,10 @@ export const AdminCalendarView = ({
               {format(currentMonth, "MMMM yyyy")}
             </CardTitle>
             <div className="flex items-center gap-2">
+              <CalendarViewToggle
+                viewMode={viewMode}
+                onViewModeChange={(mode) => setViewMode(mode)}
+              />
               <Button
                 variant="outline"
                 size="icon"

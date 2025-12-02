@@ -76,7 +76,7 @@ const Classes = () => {
   const [showBookingDialog, setShowBookingDialog] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "calendar">("calendar");
-  const [calendarViewMode, setCalendarViewMode] = useState<"month" | "day">("month");
+  const [calendarViewMode, setCalendarViewMode] = useState<"weekly" | "monthly">("weekly");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   
   const { toast } = useToast();
@@ -420,7 +420,6 @@ const Classes = () => {
             }))}
             onDateClick={(date) => {
               setSelectedDate(date);
-              setCalendarViewMode("day");
             }}
             onSessionClick={(session) => {
               const fullSession = filteredSessions.find(s => s.id === session.id);

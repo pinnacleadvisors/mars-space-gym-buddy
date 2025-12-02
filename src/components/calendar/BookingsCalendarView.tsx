@@ -1,21 +1,22 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, parseISO } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, parseISO, addWeeks, subWeeks } from "date-fns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { BookingWithDetails } from "@/hooks/useBookings";
+import { CalendarViewToggle } from "./CalendarViewToggle";
 
 interface BookingsCalendarViewProps {
   bookings: BookingWithDetails[];
   onDateClick?: (date: Date) => void;
   onBookingClick?: (booking: BookingWithDetails) => void;
   selectedDate?: Date | null;
-  viewMode?: "month" | "day";
-  onViewModeChange?: (mode: "month" | "day") => void;
+  viewMode?: "weekly" | "monthly";
+  onViewModeChange?: (mode: "weekly" | "monthly") => void;
 }
 
 export const BookingsCalendarView = ({
@@ -23,10 +24,11 @@ export const BookingsCalendarView = ({
   onDateClick,
   onBookingClick,
   selectedDate,
-  viewMode = "month",
+  viewMode = "weekly",
   onViewModeChange,
 }: BookingsCalendarViewProps) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentWeek, setCurrentWeek] = useState(new Date());
 
   // Filter bookings that have valid class_sessions
   const validBookings = useMemo(() => {
@@ -71,30 +73,138 @@ export const BookingsCalendarView = ({
 
   const handleDateClick = (date: Date) => {
     onDateClick?.(date);
-    if (onViewModeChange) {
-      onViewModeChange("day");
-    }
   };
 
-  if (viewMode === "day" && selectedDate) {
+  const handlePreviousWeek = () => {
+    setCurrentWeek(subWeeks(currentWeek, 1));
+  };
+
+  const handleNextWeek = () => {
+    setCurrentWeek(addWeeks(currentWeek, 1));
+  };
+
+  // Weekly view
+  if (viewMode === "weekly") {
+    const weekStart = startOfWeek(currentWeek);
+    const weekEnd = endOfWeek(currentWeek);
+    const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
     return (
-      <DayView
-        date={selectedDate}
-        bookings={getBookingsForDate(selectedDate)}
-        onBookingClick={onBookingClick}
-        onBack={() => {
-          if (onViewModeChange) {
-            onViewModeChange("month");
-          }
-        }}
-        onDateChange={(date) => {
-          setCurrentMonth(startOfMonth(date));
-          onDateClick?.(date);
-        }}
-      />
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-2xl font-bold">
+              {format(weekStart, "MMM d")} - {format(weekEnd, "MMM d, yyyy")}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <CalendarViewToggle
+                viewMode={viewMode}
+                onViewModeChange={(mode) => onViewModeChange?.(mode)}
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handlePreviousWeek}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleNextWeek}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  const today = new Date();
+                  setCurrentWeek(today);
+                }}
+              >
+                Today
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* Weekday headers */}
+            <div className="grid grid-cols-7 gap-1">
+              {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+                <div
+                  key={day}
+                  className="text-center text-sm font-medium text-muted-foreground py-2"
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* Horizontal separator */}
+            <div className="border-t border-border" />
+
+            {/* Weekly grid */}
+            <div className="grid grid-cols-7 gap-1">
+              {weekDays.map((day, dayIndex) => {
+                const dayBookings = getBookingsForDate(day);
+                const isToday = isSameDay(day, new Date());
+                const isSelected = selectedDate && isSameDay(day, selectedDate);
+
+                return (
+                  <div
+                    key={dayIndex}
+                    className={cn(
+                      "min-h-[200px] p-2 cursor-pointer transition-colors border rounded-lg",
+                      isToday && "bg-primary/5 border-primary",
+                      isSelected && !isToday && "bg-primary/10 border-primary/50",
+                      "hover:bg-accent"
+                    )}
+                    onClick={() => handleDateClick(day)}
+                  >
+                    <div
+                      className={cn(
+                        "text-sm font-semibold mb-2",
+                        isToday && "text-primary",
+                        isSelected && "text-primary"
+                      )}
+                    >
+                      {format(day, "d")}
+                    </div>
+                    <div className="space-y-1">
+                      {dayBookings.map((booking) => {
+                        if (!booking.class_sessions) return null;
+                        return (
+                          <Badge
+                            key={booking.id}
+                            variant={booking.status === "cancelled" ? "secondary" : "default"}
+                            className={cn(
+                              "w-full text-xs truncate cursor-pointer block",
+                              booking.status === "cancelled" 
+                                ? "opacity-50 line-through" 
+                                : "hover:bg-primary hover:text-primary-foreground"
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onBookingClick?.(booking);
+                            }}
+                          >
+                            {format(parseISO(booking.class_sessions.start_time), "h:mm a")} - {booking.class_sessions.name}
+                          </Badge>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
+  // Monthly view
   return (
     <Card>
       <CardHeader>
@@ -103,6 +213,10 @@ export const BookingsCalendarView = ({
             {format(currentMonth, "MMMM yyyy")}
           </CardTitle>
           <div className="flex items-center gap-2">
+            <CalendarViewToggle
+              viewMode={viewMode}
+              onViewModeChange={(mode) => onViewModeChange?.(mode)}
+            />
             <Button
               variant="outline"
               size="icon"

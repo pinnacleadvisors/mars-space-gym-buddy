@@ -22,7 +22,12 @@ export function TopBar() {
       <div className="flex h-16 items-center justify-between px-4">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="md:hidden" />
-          <h1 className="text-xl font-bold text-primary">marsspace</h1>
+          <h1 
+            className="text-xl font-bold text-primary cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => navigate("/dashboard")}
+          >
+            marsspace
+          </h1>
         </div>
 
         <div className="flex items-center gap-3">

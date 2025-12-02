@@ -79,13 +79,11 @@ export function AppSidebar() {
 
   // 🧭 Always visible (member) menu
   const mainNavItems = [
+    { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
     { icon: Calendar, label: "Classes", path: "/classes" },
     { icon: BookOpen, label: "Bookings", path: "/bookings" },
     { icon: CreditCard, label: "Membership", path: "/managememberships" },
     { icon: Trophy, label: "Rewards", path: "/rewards" },
-    { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-    { icon: UserCog, label: "Profile", path: "/profile" },
-    { icon: Settings, label: "Settings", path: "/settings" },
   ];
 
   // 🧩 Admin-only menu (added if admin)
@@ -105,11 +103,6 @@ export function AppSidebar() {
       <SidebarContent>
         {/* Header */}
         <div className="flex items-center justify-between p-4">
-          {open && (
-            <h2 className="text-lg font-bold text-primary animate-fade-in">
-              marsspace
-            </h2>
-          )}
           {/* Desktop toggle button */}
           <Button
             variant="ghost"
