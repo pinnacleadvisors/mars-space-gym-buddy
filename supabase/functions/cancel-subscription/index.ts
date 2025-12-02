@@ -243,6 +243,7 @@ serve(async (req) => {
         logStep("No Stripe customer found but membership is Stripe - keeping active until end_date");
         
         // Keep status as "active" to maintain benefits until end_date
+        // Do NOT set cancelled_at for Stripe memberships - only for non-Stripe payment methods
         const { error: updateError } = await supabaseClient
           .from("user_memberships")
           .update({
@@ -280,6 +281,7 @@ serve(async (req) => {
         logStep("No active Stripe subscription found - keeping active until end_date");
         
         // Keep status as "active" to maintain benefits until end_date
+        // Do NOT set cancelled_at for Stripe memberships - only for non-Stripe payment methods
         const { error: updateError } = await supabaseClient
           .from("user_memberships")
           .update({
@@ -320,6 +322,7 @@ serve(async (req) => {
     // Update user_membership in database
     // Keep status as "active" to maintain benefits until period end
     // Stripe will handle the actual cancellation at period end
+    // Do NOT set cancelled_at for Stripe memberships - only for non-Stripe payment methods
     const { error: updateError } = await supabaseClient
       .from("user_memberships")
       .update({

@@ -554,8 +554,12 @@ export default function ManageMemberships() {
         description: responseData?.message || "Your membership has been cancelled successfully. Benefits will continue until the end date.",
       });
 
-      // Store cancellation status in localStorage FIRST, before fetchData updates state
-      if (userMembership) {
+      // Only set optimistic state for non-Stripe memberships (Stripe won't have cancelled_at)
+      const isStripeMembership = userMembership?.payment_method === "stripe" || 
+                                  userMembership?.stripe_subscription_id !== null;
+      
+      if (userMembership && !isStripeMembership) {
+        // Store cancellation status in localStorage FIRST, before fetchData updates state
         const cancellationKey = `membership_cancelled_${userMembership.id}`;
         const cancellationData = {
           cancelledAt: new Date().toISOString(),
@@ -563,20 +567,78 @@ export default function ManageMemberships() {
         };
         localStorage.setItem(cancellationKey, JSON.stringify(cancellationData));
         console.log("✅ Cancellation saved to localStorage:", { key: cancellationKey, data: cancellationData });
+        
+        // Optimistically update the cancellation state immediately for non-Stripe memberships
+        // This ensures the UI reflects the cancellation right away, even before database fetch
+        const endDate = new Date(userMembership.end_date);
+        const today = new Date();
+        const daysRemaining = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (endDate > today && daysRemaining > 0) {
+          setIsCancellationRequested(true);
+          setRemainingDays(daysRemaining);
+        }
       }
 
-      // Wait a bit for the database transaction to commit before fetching
-      // This prevents race conditions with the real-time subscription
-      await new Promise(resolve => setTimeout(resolve, 300));
+      // Capture membership ID before async operations to avoid stale state
+      const membershipId = userMembership?.id;
       
-      // Refresh data to get updated membership
+      // Wait for the database transaction to commit before fetching
+      // Use a longer delay to ensure the database update is fully committed
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // Refresh data to get updated membership with cancelled_at from database
       await fetchData();
       
-      // Explicitly call checkCancellationStatus after fetchData to ensure state is updated
-      // The useEffect will also call it, but this ensures it happens immediately
-      setTimeout(() => {
-        checkCancellationStatus();
-      }, 100);
+      // Wait a bit more for state to update, then verify cancellation status
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Explicitly verify and update cancellation status after fetchData
+      // This ensures the state is correct even if the useEffect didn't trigger properly
+      if (membershipId) {
+        // Re-fetch the membership to ensure we have the latest data with cancelled_at
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: updatedMembership } = await supabase
+            .from("user_memberships")
+            .select("*, cancelled_at")
+            .eq("user_id", user.id)
+            .eq("id", membershipId)
+            .single();
+          
+          if (updatedMembership) {
+            setUserMembership(updatedMembership);
+            
+            // Directly update cancellation state based on the fetched data
+            // This ensures the UI updates immediately without waiting for useEffect
+            const endDate = new Date(updatedMembership.end_date);
+            const today = new Date();
+            const daysRemaining = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+            
+            if (endDate > today && daysRemaining > 0) {
+              setRemainingDays(daysRemaining);
+              
+              // For non-Stripe memberships, check cancelled_at
+              const isStripe = updatedMembership.payment_method === "stripe" || 
+                              updatedMembership.stripe_subscription_id !== null;
+              
+              if (!isStripe && updatedMembership.cancelled_at) {
+                setIsCancellationRequested(true);
+                console.log("✅ Cancellation state updated from database:", {
+                  cancelled_at: updatedMembership.cancelled_at,
+                  daysRemaining
+                });
+              } else if (!isStripe) {
+                // If cancelled_at is not set, check localStorage as fallback
+                const cancellationKey = `membership_cancelled_${membershipId}`;
+                const cancellationData = localStorage.getItem(cancellationKey);
+                if (cancellationData) {
+                  setIsCancellationRequested(true);
+                }
+              }
+            }
+          }
+        }
+      }
     } catch (error: any) {
       console.error("Error cancelling membership:", error);
       const errorMessage = error?.message || 

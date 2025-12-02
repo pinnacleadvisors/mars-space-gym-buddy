@@ -131,9 +131,12 @@ const AdminUserMemberships = () => {
         .select("*, cancelled_at, profiles(full_name), memberships(name)")
         .order("created_at", { ascending: false });
       
-      // Filter to show only cancelled memberships if toggle is on
+      // Filter to show only cancelled non-Stripe memberships if toggle is on
       if (showCancelledOnly) {
-        query = query.not("cancelled_at", "is", null);
+        query = query
+          .not("cancelled_at", "is", null)
+          .neq("payment_method", "stripe")
+          .is("stripe_subscription_id", null);
       }
       
       const [userMembershipsRes, usersRes, membershipsRes] = await Promise.all([
@@ -339,7 +342,7 @@ const AdminUserMemberships = () => {
             variant={showCancelledOnly ? "default" : "outline"}
             onClick={() => setShowCancelledOnly(!showCancelledOnly)}
           >
-            {showCancelledOnly ? "Show All" : "Show Cancelled Only"}
+            {showCancelledOnly ? "Show All" : "Cancelled List (Non-Stripe)"}
           </Button>
           <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
@@ -474,6 +477,7 @@ const AdminUserMemberships = () => {
                     <SelectItem value="cash">Cash</SelectItem>
                     <SelectItem value="card">Card</SelectItem>
                     <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                    <SelectItem value="direct_debit">Direct Debit</SelectItem>
                     <SelectItem value="staff">Staff</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
                   </SelectContent>
@@ -520,7 +524,6 @@ const AdminUserMemberships = () => {
                 userMemberships.map((um) => (
                   <TableRow 
                     key={um.id}
-                    className={um.cancelled_at ? "bg-yellow-50 dark:bg-yellow-900/10" : ""}
                   >
                     <TableCell className="font-medium">
                       {um.profiles?.full_name || "Unknown User"}
