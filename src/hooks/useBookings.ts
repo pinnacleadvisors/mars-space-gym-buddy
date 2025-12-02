@@ -84,35 +84,69 @@ export const useBookings = (userId?: string) => {
    */
   useEffect(() => {
     const targetUserId = userId || user?.id;
-    if (!targetUserId) {
+    if (!targetUserId || targetUserId.trim() === '') {
+      setLoading(false);
+      return;
+    }
+
+    // Validate UUID format to prevent "invalid input syntax for type uuid" errors
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const trimmedUserId = targetUserId.trim();
+    if (!uuidRegex.test(trimmedUserId)) {
+      console.error("Invalid user ID format for bookings subscription:", trimmedUserId);
       setLoading(false);
       return;
     }
 
     // Fetch initial bookings
-    fetchBookings(targetUserId);
+    fetchBookings(trimmedUserId);
 
     // Set up real-time subscription for booking updates
-    const channel = supabase
-      .channel('bookings-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'class_bookings',
-          filter: `user_id=eq.${targetUserId}`,
-        },
-        (payload) => {
-          console.log('Booking change detected:', payload);
-          // Refetch bookings when changes occur
-          fetchBookings(targetUserId);
-        }
-      )
-      .subscribe();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let mounted = true;
+
+    const setupSubscription = async () => {
+      // Ensure we have a valid session first
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session || !mounted) {
+        console.log("No session available for bookings subscription");
+        return;
+      }
+
+      channel = supabase
+        .channel(`bookings-changes-${trimmedUserId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'class_bookings',
+            filter: `user_id=eq.${trimmedUserId}`, // Use trimmed and validated UUID
+          },
+          (payload) => {
+            console.log('Booking change detected:', payload);
+            // Refetch bookings when changes occur
+            if (mounted) {
+              fetchBookings(trimmedUserId);
+            }
+          }
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log("Bookings subscription active");
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error("Bookings subscription error");
+          }
+        });
+    };
+
+    setupSubscription();
 
     return () => {
-      supabase.removeChannel(channel);
+      mounted = false;
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [userId, user?.id, fetchBookings]);
 

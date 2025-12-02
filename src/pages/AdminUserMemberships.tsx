@@ -83,11 +83,52 @@ const AdminUserMemberships = () => {
     fetchData();
   }, [showCancelledOnly]);
 
+  // Set up real-time subscription for membership updates
+  useEffect(() => {
+    let mounted = true;
+    const channels: ReturnType<typeof supabase.channel>[] = [];
+
+    const setupSubscription = async () => {
+      // Set up real-time subscription to listen for changes to user_memberships
+      const channel = supabase
+        .channel('admin-user-memberships-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // Listen for INSERT, UPDATE, DELETE
+            schema: 'public',
+            table: 'user_memberships',
+          },
+          (payload) => {
+            console.log('User membership change detected in admin view:', payload);
+            // Refresh data when changes occur
+            if (mounted) {
+              fetchData();
+            }
+          }
+        )
+        .subscribe();
+      
+      channels.push(channel);
+    };
+
+    setupSubscription();
+
+    return () => {
+      mounted = false;
+      // Clean up all channels
+      channels.forEach((channel) => {
+        supabase.removeChannel(channel);
+      });
+    };
+  }, []);
+
   const fetchData = async () => {
     try {
+      // Explicitly include cancelled_at in the select to ensure it's fetched
       let query = supabase
         .from("user_memberships")
-        .select("*, profiles(full_name), memberships(name)")
+        .select("*, cancelled_at, profiles(full_name), memberships(name)")
         .order("created_at", { ascending: false });
       
       // Filter to show only cancelled memberships if toggle is on
@@ -159,7 +200,35 @@ const AdminUserMemberships = () => {
     }
 
     try {
-      const userMembershipData = {
+      // Check for existing active membership when creating new one
+      if (!editingUserMembership) {
+        const { data: existingMemberships, error: checkError } = await supabase
+          .from("user_memberships")
+          .select("id, status, end_date")
+          .eq("user_id", formData.user_id)
+          .eq("status", "active"); // Only check for active memberships
+
+        if (checkError) throw checkError;
+
+        if (existingMemberships && existingMemberships.length > 0) {
+          // Check if any active membership hasn't expired yet
+          const activeNonExpired = existingMemberships.some((membership) => {
+            const endDate = new Date(membership.end_date);
+            return endDate > new Date();
+          });
+
+          if (activeNonExpired) {
+            toast({
+              variant: "destructive",
+              title: "Error",
+              description: "This user already has an active membership. Please edit the existing membership or wait until it expires before creating a new one.",
+            });
+            return;
+          }
+        }
+      }
+
+      const userMembershipData: any = {
         user_id: formData.user_id,
         membership_id: formData.membership_id,
         start_date: formData.start_date,
@@ -168,6 +237,11 @@ const AdminUserMemberships = () => {
         payment_status: formData.payment_status,
         payment_method: formData.payment_method,
       };
+
+      // Clear cancelled_at when status is changed to "active"
+      if (formData.status === "active") {
+        userMembershipData.cancelled_at = null;
+      }
 
       if (editingUserMembership) {
         const { error } = await supabase

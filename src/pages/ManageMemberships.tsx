@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ interface UserMembership {
   payment_status: string;
   payment_method: string | null;
   stripe_subscription_id: string | null;
+  cancelled_at: string | null;
 }
 
 interface Membership {
@@ -37,10 +38,132 @@ export default function ManageMemberships() {
   const [remainingDays, setRemainingDays] = useState<number | null>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const fetchingRef = useRef(false);
 
   useEffect(() => {
     fetchData();
     checkSubscriptionStatus();
+  }, []);
+
+  // Set up real-time subscription for membership updates
+  useEffect(() => {
+    let mounted = true;
+    const channels: ReturnType<typeof supabase.channel>[] = [];
+    let fetchTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    const setupSubscription = async () => {
+      try {
+        // First, ensure we have a valid session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("Error getting session for subscription:", sessionError);
+          return;
+        }
+        
+        if (!session) {
+          console.log("No session available, cannot set up subscription");
+          return;
+        }
+
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        // Check for errors or missing user
+        if (userError) {
+          console.error("Error getting user for subscription:", userError);
+          return;
+        }
+        
+        // Validate user and user.id before setting up subscription
+        if (!user || !user.id || user.id.trim() === '' || !mounted) {
+          console.log("Cannot set up subscription: user or user.id is missing or empty");
+          return;
+        }
+
+        // Validate UUID format (basic check)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const trimmedUserId = user.id.trim();
+        if (!uuidRegex.test(trimmedUserId)) {
+          console.error("Invalid user ID format for subscription:", trimmedUserId);
+          return;
+        }
+
+        // Set up real-time subscription to listen for changes to user_memberships
+        const channel = supabase
+          .channel(`user-memberships-changes-${trimmedUserId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*', // Listen for INSERT, UPDATE, DELETE
+              schema: 'public',
+              table: 'user_memberships',
+              filter: `user_id=eq.${trimmedUserId}`, // Use trimmed and validated UUID
+            },
+            (payload) => {
+              console.log('Membership change detected:', payload);
+              // Debounce fetchData to avoid race conditions with database commits
+              // Add a small delay to ensure the database transaction is committed
+              if (fetchTimeout) {
+                clearTimeout(fetchTimeout);
+              }
+              fetchTimeout = setTimeout(() => {
+                if (mounted) {
+                  fetchData();
+                }
+              }, 500); // 500ms delay to ensure database commit is complete
+            }
+          )
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              console.log("Real-time subscription active for user:", trimmedUserId);
+            } else if (status === 'CHANNEL_ERROR') {
+              console.error("Real-time subscription error for user:", trimmedUserId);
+            }
+          });
+        
+        channels.push(channel);
+        console.log("Real-time subscription set up successfully for user:", trimmedUserId);
+      } catch (error) {
+        console.error("Error setting up subscription:", error);
+      }
+    };
+
+    // Wait for session to be established before setting up subscription
+    const checkAndSetup = async () => {
+      // Wait a bit for auth to initialize
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Check if session exists, if not wait a bit more
+      let attempts = 0;
+      const maxAttempts = 10;
+      
+      while (attempts < maxAttempts && mounted) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          await setupSubscription();
+          return;
+        }
+        attempts++;
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      
+      if (mounted && attempts >= maxAttempts) {
+        console.warn("Could not establish session for real-time subscription after multiple attempts");
+      }
+    };
+
+    checkAndSetup();
+
+    return () => {
+      mounted = false;
+      if (fetchTimeout) {
+        clearTimeout(fetchTimeout);
+      }
+      // Clean up all channels
+      channels.forEach((channel) => {
+        supabase.removeChannel(channel);
+      });
+    };
   }, []);
 
   useEffect(() => {
@@ -89,18 +212,46 @@ export default function ManageMemberships() {
       if (endDate > today && daysRemaining > 0) {
         setRemainingDays(daysRemaining);
         
-        // Check localStorage to see if cancellation was requested
+        // Check if membership was reactivated (cancelled_at is null in database)
+        // If cancelled_at is null, the membership was reactivated by admin, so clear localStorage
+        if (!userMembership.cancelled_at) {
+          // Membership was reactivated - clear localStorage cancellation data
+          const cancellationKey = `membership_cancelled_${userMembership.id}`;
+          localStorage.removeItem(cancellationKey);
+          setIsCancellationRequested(false);
+          console.log("Membership reactivated - cleared cancellation data");
+          return;
+        }
+        
+        // If cancelled_at exists in database, show cancellation message
+        // This is the source of truth - database state overrides localStorage
+        if (userMembership.cancelled_at) {
+          setIsCancellationRequested(true);
+          console.log("Cancellation exists in database - showing cancellation message");
+          
+          // Also update localStorage for consistency (in case user cancels via Stripe and we want to track it)
+          const cancellationKey = `membership_cancelled_${userMembership.id}`;
+          const cancellationData = {
+            cancelledAt: userMembership.cancelled_at,
+            endDate: userMembership.end_date
+          };
+          localStorage.setItem(cancellationKey, JSON.stringify(cancellationData));
+          return;
+        }
+        
+        // Fallback: Check localStorage for legacy cancellation data (for Stripe memberships)
+        // This handles cases where cancellation was done before cancelled_at was added
         const cancellationKey = `membership_cancelled_${userMembership.id}`;
         const cancellationData = localStorage.getItem(cancellationKey);
         
         if (cancellationData) {
           try {
             const { cancelledAt, endDate: storedEndDate } = JSON.parse(cancellationData);
-            console.log("Found cancellation data:", { storedEndDate, currentEndDate: userMembership.end_date, daysRemaining });
+            console.log("Found cancellation data in localStorage:", { storedEndDate, currentEndDate: userMembership.end_date, daysRemaining });
             // Verify the end date matches (membership hasn't changed)
             if (storedEndDate === userMembership.end_date) {
               setIsCancellationRequested(true);
-              console.log("Setting cancellation requested to true");
+              console.log("Setting cancellation requested to true from localStorage");
             } else {
               // End date changed, clear old cancellation data
               console.log("End date mismatch, clearing cancellation data");
@@ -113,7 +264,7 @@ export default function ManageMemberships() {
             setIsCancellationRequested(false);
           }
         } else {
-          console.log("No cancellation data found in localStorage");
+          console.log("No cancellation data found");
           setIsCancellationRequested(false);
         }
       } else {
@@ -156,6 +307,13 @@ export default function ManageMemberships() {
   }, []);
 
   const fetchData = async () => {
+    // Prevent concurrent fetches
+    if (fetchingRef.current) {
+      console.log("Fetch already in progress, skipping...");
+      return;
+    }
+
+    fetchingRef.current = true;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -164,9 +322,10 @@ export default function ManageMemberships() {
       }
 
       // First, fetch user's current membership (any membership)
+      // Explicitly select cancelled_at to ensure it's included
       const { data: userMembershipData, error: userMembershipError } = await supabase
         .from("user_memberships")
-        .select("*")
+        .select("*, cancelled_at")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -208,6 +367,7 @@ export default function ManageMemberships() {
       });
     } finally {
       setLoading(false);
+      fetchingRef.current = false;
     }
   };
 
@@ -405,6 +565,10 @@ export default function ManageMemberships() {
         console.log("✅ Cancellation saved to localStorage:", { key: cancellationKey, data: cancellationData });
       }
 
+      // Wait a bit for the database transaction to commit before fetching
+      // This prevents race conditions with the real-time subscription
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
       // Refresh data to get updated membership
       await fetchData();
       
