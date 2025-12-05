@@ -97,7 +97,8 @@ CREATE POLICY "Admins can update categories"
     ON public.class_categories
     FOR UPDATE
     TO authenticated
-    USING (public.has_role(auth.uid(), 'admin'::app_role));
+    USING (public.has_role(auth.uid(), 'admin'::app_role))
+    WITH CHECK (public.has_role(auth.uid(), 'admin'::app_role));
 
 -- Policy: Admins can delete categories
 CREATE POLICY "Admins can delete categories"

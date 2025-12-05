@@ -406,7 +406,8 @@ BEGIN
     CREATE POLICY "Users can update their own profile"
     ON public.profiles FOR UPDATE
     TO authenticated
-    USING (auth.uid() = id);
+    USING (auth.uid() = id)
+    WITH CHECK (auth.uid() = id);
     
     DROP POLICY IF EXISTS "Users can insert their own profile" ON public.profiles;
     CREATE POLICY "Users can insert their own profile"
@@ -424,7 +425,8 @@ BEGIN
     CREATE POLICY "Admins can update all profiles"
     ON public.profiles FOR UPDATE
     TO authenticated
-    USING (public.has_role(auth.uid(), 'admin'));
+    USING (public.has_role(auth.uid(), 'admin'))
+    WITH CHECK (public.has_role(auth.uid(), 'admin'));
     
     DROP POLICY IF EXISTS "Admins can insert profiles" ON public.profiles;
     CREATE POLICY "Admins can insert profiles"
