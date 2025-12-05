@@ -91,6 +91,39 @@ export type Database = {
           },
         ]
       }
+      class_categories: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          display_order: number | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       class_sessions: {
         Row: {
           capacity: number | null
@@ -136,6 +169,7 @@ export type Database = {
         Row: {
           capacity: number
           category: string | null
+          category_id: string | null
           created_at: string | null
           description: string | null
           duration: number
@@ -150,6 +184,7 @@ export type Database = {
         Insert: {
           capacity?: number
           category?: string | null
+          category_id?: string | null
           created_at?: string | null
           description?: string | null
           duration: number
@@ -164,6 +199,7 @@ export type Database = {
         Update: {
           capacity?: number
           category?: string | null
+          category_id?: string | null
           created_at?: string | null
           description?: string | null
           duration?: number
@@ -175,7 +211,15 @@ export type Database = {
           schedule?: string
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "classes_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "class_categories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       coupon_codes: {
         Row: {
