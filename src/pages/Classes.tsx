@@ -1,53 +1,28 @@
 import { useState, useEffect, useMemo } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Clock, Users, Loader2, Search, Calendar, User, Filter, Grid3x3, CalendarDays } from "lucide-react";
+import { Search, CalendarDays, Grid3x3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { toastMessages, showErrorToast } from "@/lib/utils/toastHelpers";
-import { useBookings } from "@/hooks/useBookings";
-import { format, parseISO, isAfter, isBefore, startOfToday } from "date-fns";
+import { showErrorToast } from "@/lib/utils/toastHelpers";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClassCardSkeletons } from "@/components/loading/ClassCardSkeleton";
 import { ClassCalendarView } from "@/components/calendar/ClassCalendarView";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ClassCard } from "@/components/class/ClassCard";
 
-interface Class {
+interface ClassType {
   id: string;
   name: string;
-  category: string | null;
-  category_id: string | null;
   description: string | null;
   image_url: string | null;
+  category_id: string | null;
+  category: string | null;
+  class_categories?: {
+    id: string;
+    name: string;
+    image_url: string | null;
+  };
 }
 
 interface ClassCategory {
@@ -66,51 +41,23 @@ interface ClassSession {
   start_time: string;
   end_time: string;
   capacity: number | null;
-  created_at: string;
   class_id: string | null;
-  classes?: {
-    name: string;
-    category: string | null;
-    category_id: string | null;
-    description: string | null;
-    image_url: string | null;
-    class_categories?: {
-      id: string;
-      name: string;
-      image_url: string | null;
-    };
-  };
 }
 
-interface ClassSessionWithAvailability extends ClassSession {
-  bookedCount: number;
-  availableSpots: number;
-  isBooked: boolean;
-  isPast: boolean;
-  category?: string | null;
-}
+const CLASSES_PER_PAGE = 12;
 
 const Classes = () => {
-  const [sessions, setSessions] = useState<ClassSession[]>([]);
-  const [classes, setClasses] = useState<Class[]>([]);
+  const navigate = useNavigate();
+  const [classes, setClasses] = useState<ClassType[]>([]);
+  const [allSessions, setAllSessions] = useState<ClassSession[]>([]);
   const [categories, setCategories] = useState<ClassCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [selectedClass, setSelectedClass] = useState<string>("all");
-  const [selectedInstructor, setSelectedInstructor] = useState<string>("all");
-  const [dateFilter, setDateFilter] = useState<string>("upcoming");
-  const [selectedSession, setSelectedSession] = useState<ClassSessionWithAvailability | null>(null);
-  const [showBookingDialog, setShowBookingDialog] = useState(false);
-  const [bookingLoading, setBookingLoading] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(CLASSES_PER_PAGE);
   const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid");
   const [calendarViewMode, setCalendarViewMode] = useState<"daily" | "weekly" | "monthly">("weekly");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [selectedCategoryForSidebar, setSelectedCategoryForSidebar] = useState<ClassCategory | null>(null);
-  
-  const { toast } = useToast();
-  const { bookings, createBooking, refreshBookings } = useBookings();
 
   useEffect(() => {
     fetchData();
@@ -132,39 +79,37 @@ const Classes = () => {
       if (categoriesError) throw categoriesError;
       setCategories((categoriesData || []) as unknown as ClassCategory[]);
       
-      // Fetch upcoming class sessions with class data and category info
-      const { data: sessionsData, error: sessionsError } = await supabase
-        .from("class_sessions")
-        .select(`
-          *,
-          classes (
-            name,
-            category,
-            category_id,
-            description,
-            image_url,
-            class_categories (
-              id,
-              name,
-              image_url
-            )
-          )
-        `)
-        .gte("start_time", now)
-        .order("start_time", { ascending: true });
-
-      if (sessionsError) throw sessionsError;
-      setSessions((sessionsData || []) as ClassSession[]);
-
-      // Fetch all classes for filter
+      // Fetch all active classes with category info
       const { data: classesData, error: classesError } = await supabase
         .from("classes")
-        .select("id, name, category, category_id, description, image_url")
+        .select(`
+          id,
+          name,
+          description,
+          image_url,
+          category_id,
+          category,
+          class_categories (
+            id,
+            name,
+            image_url
+          )
+        `)
         .eq("is_active", true)
         .order("name", { ascending: true });
 
       if (classesError) throw classesError;
-      setClasses((classesData || []) as Class[]);
+      setClasses((classesData || []) as ClassType[]);
+
+      // Fetch all upcoming sessions for calendar view
+      const { data: sessionsData, error: sessionsError } = await supabase
+        .from("class_sessions")
+        .select("*")
+        .gte("start_time", now)
+        .order("start_time", { ascending: true });
+
+      if (sessionsError) throw sessionsError;
+      setAllSessions((sessionsData || []) as ClassSession[]);
     } catch (error: any) {
       showErrorToast({
         title: "Error",
@@ -175,176 +120,52 @@ const Classes = () => {
     }
   };
 
-  // Get unique instructors, categories, and class names for filters
-  const instructors = useMemo(() => {
-    const unique = Array.from(new Set(sessions.map(s => s.instructor).filter(Boolean)));
-    return unique.sort();
-  }, [sessions]);
+  // Filter classes based on search and category
+  const filteredClasses = useMemo(() => {
+    let filtered = classes;
 
-  // Use categories from database, fallback to extracted categories from sessions
-  const availableCategories = useMemo(() => {
-    if (categories.length > 0) {
-      return categories;
+    // Category filter
+    if (selectedCategory !== "all") {
+      filtered = filtered.filter((classItem) => {
+        return classItem.category_id === selectedCategory || 
+               classItem.class_categories?.id === selectedCategory;
+      });
     }
-    // Fallback: extract from sessions
-    const unique = Array.from(
-      new Set(
-        sessions
-          .map(s => (s.classes as any)?.category || (s.classes as any)?.category_id || null)
-          .filter(Boolean)
-      )
-    );
-    return unique.map((cat) => ({ id: cat, name: cat, description: null, image_url: null, is_active: true, display_order: 0 } as ClassCategory)).sort((a, b) => a.name.localeCompare(b.name));
-  }, [categories, sessions]);
-
-  const classNames = useMemo(() => {
-    return classes.map(c => c.name).sort();
-  }, [classes]);
-
-  // Calculate availability for each session
-  const sessionsWithAvailability = useMemo((): ClassSessionWithAvailability[] => {
-    return sessions.map(session => {
-      // Count bookings for this session
-      const sessionBookings = bookings.filter(
-        b => b.class_id === session.id && (b.status === 'booked' || b.status === 'confirmed')
-      );
-      const bookedCount = sessionBookings.length;
-      const capacity = session.capacity || 0;
-      const availableSpots = Math.max(0, capacity - bookedCount);
-      
-      // Check if user has booked this session
-      const userBookings = bookings.filter(
-        b => b.class_id === session.id && (b.status === 'booked' || b.status === 'confirmed')
-      );
-      const isBooked = userBookings.length > 0;
-      
-      // Check if session is in the past
-      const isPast = isBefore(parseISO(session.start_time), new Date());
-
-      return {
-        ...session,
-        bookedCount,
-        availableSpots,
-        isBooked,
-        isPast,
-        category: (session.classes as any)?.category || (session.classes as any)?.class_categories?.name || null,
-      };
-    });
-  }, [sessions, bookings]);
-
-  // Filter sessions based on search and filters
-  const filteredSessions = useMemo(() => {
-    let filtered = sessionsWithAvailability;
 
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        session =>
-          session.name.toLowerCase().includes(query) ||
-          session.instructor?.toLowerCase().includes(query) ||
-          session.classes?.name.toLowerCase().includes(query)
+        (classItem) =>
+          classItem.name.toLowerCase().includes(query) ||
+          classItem.description?.toLowerCase().includes(query) ||
+          classItem.class_categories?.name.toLowerCase().includes(query)
       );
     }
 
-    // Class name filter
-    if (selectedClass !== "all") {
-      filtered = filtered.filter(session => session.classes?.name === selectedClass);
-    }
-
-    // Category filter
-    if (selectedCategory !== "all") {
-      filtered = filtered.filter(session => {
-        const sessionCategoryId = (session.classes as any)?.category_id;
-        const sessionCategoryName = (session.classes as any)?.category || session.category;
-        return sessionCategoryId === selectedCategory || sessionCategoryName === selectedCategory;
-      });
-    }
-
-    // Instructor filter
-    if (selectedInstructor !== "all") {
-      filtered = filtered.filter(session => session.instructor === selectedInstructor);
-    }
-
-    // Date filter
-    if (dateFilter === "today") {
-      const today = startOfToday();
-      filtered = filtered.filter(session => {
-        const sessionDate = parseISO(session.start_time);
-        return sessionDate >= today && sessionDate < new Date(today.getTime() + 24 * 60 * 60 * 1000);
-      });
-    } else if (dateFilter === "this-week") {
-      const today = startOfToday();
-      const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
-      filtered = filtered.filter(session => {
-        const sessionDate = parseISO(session.start_time);
-        return sessionDate >= today && sessionDate < nextWeek;
-      });
-    } else if (dateFilter === "my-bookings") {
-      filtered = filtered.filter(session => session.isBooked);
-    }
-
     return filtered;
-  }, [sessionsWithAvailability, searchQuery, selectedClass, selectedCategory, selectedInstructor, dateFilter]);
+  }, [classes, selectedCategory, searchQuery]);
 
-  // Filter sessions for sidebar (by selected category)
-  const sidebarSessions = useMemo(() => {
-    if (!selectedCategoryForSidebar) return [];
-    
-    return sessionsWithAvailability.filter(session => {
-      const sessionCategoryId = (session.classes as any)?.category_id;
-      const sessionCategoryName = (session.classes as any)?.category || session.category;
-      return sessionCategoryId === selectedCategoryForSidebar.id || sessionCategoryName === selectedCategoryForSidebar.name;
-    });
-  }, [sessionsWithAvailability, selectedCategoryForSidebar]);
+  // Paginated classes
+  const visibleClasses = useMemo(() => {
+    return filteredClasses.slice(0, visibleCount);
+  }, [filteredClasses, visibleCount]);
 
-  const handleBookClick = (session: ClassSessionWithAvailability) => {
-    if (session.isBooked) {
-      toast(toastMessages.alreadyBooked());
-      return;
-    }
+  const hasMore = visibleClasses.length < filteredClasses.length;
 
-    if (session.availableSpots === 0) {
-      toast(toastMessages.classFull());
-      return;
-    }
-
-    if (session.isPast) {
-      showErrorToast({
-        title: "Cannot Book",
-        description: "This class has already started.",
-      });
-      return;
-    }
-
-    setSelectedSession(session);
-    setShowBookingDialog(true);
+  const handleLoadMore = () => {
+    setVisibleCount((prev) => prev + CLASSES_PER_PAGE);
   };
 
-  const handleConfirmBooking = async () => {
-    if (!selectedSession) return;
+  const handleCategoryClick = (categoryId: string) => {
+    setSelectedCategory(categoryId);
+    setVisibleCount(CLASSES_PER_PAGE); // Reset pagination when filter changes
+    // Scroll to top of class list
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
-    setBookingLoading(true);
-    try {
-      const result = await createBooking(selectedSession.id);
-      
-      if (result.success) {
-        toast(toastMessages.bookingCreated(selectedSession.name));
-        setShowBookingDialog(false);
-        setSelectedSession(null);
-        await refreshBookings();
-      } else {
-        toast(toastMessages.bookingFailed(result.error));
-      }
-    } catch (error: any) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: error.message || "An error occurred while booking.",
-      });
-    } finally {
-      setBookingLoading(false);
-    }
+  const handleClassClick = (classId: string) => {
+    navigate(`/classes/${classId}`);
   };
 
   if (loading) {
@@ -384,20 +205,21 @@ const Classes = () => {
             <Button
               variant={selectedCategory === "all" ? "default" : "outline"}
               size="sm"
-              onClick={() => setSelectedCategory("all")}
+              onClick={() => {
+                setSelectedCategory("all");
+                setVisibleCount(CLASSES_PER_PAGE);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
               className="rounded-full"
             >
               All
             </Button>
-            {availableCategories.map((category) => (
+            {categories.map((category) => (
               <Button
                 key={category.id}
                 variant={selectedCategory === category.id ? "default" : "outline"}
                 size="sm"
-                onClick={() => {
-                  setSelectedCategoryForSidebar(category);
-                  setSidebarOpen(true);
-                }}
+                onClick={() => handleCategoryClick(category.id)}
                 className="rounded-full"
               >
                 {category.name}
@@ -423,117 +245,46 @@ const Classes = () => {
               onClick={() => setViewMode("calendar")}
             >
               <CalendarDays className="w-4 h-4 mr-2" />
-              Calendar
+              See Calendar
             </Button>
           </div>
         </div>
 
-        {/* Filters and Search */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-              {/* Search */}
-              <div className="relative lg:col-span-2">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input
-                  placeholder="Search classes..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-
-              {/* Class Name Filter */}
-              <Select value={selectedClass} onValueChange={setSelectedClass}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Classes" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Classes</SelectItem>
-                  {classNames.map((className) => (
-                    <SelectItem key={className} value={className}>
-                      {className}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Category Filter */}
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map((category) => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Instructor Filter */}
-              <Select value={selectedInstructor} onValueChange={setSelectedInstructor}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Instructors" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Instructors</SelectItem>
-                  {instructors.map((instructor) => (
-                    <SelectItem key={instructor} value={instructor}>
-                      {instructor}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Clear Filters */}
-              {(searchQuery || selectedClass !== "all" || selectedCategory !== "all" || selectedInstructor !== "all" || dateFilter !== "upcoming") && (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setSearchQuery("");
-                    setSelectedClass("all");
-                    setSelectedCategory("all");
-                    setSelectedInstructor("all");
-                    setDateFilter("upcoming");
-                  }}
-                >
-                  Clear
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Results Count */}
-        <div className="mb-4 text-sm text-muted-foreground">
-          Showing {filteredSessions.length} of {sessions.length} classes
+        {/* Search */}
+        <div className="mb-6">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Input
+              placeholder="Search classes..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setVisibleCount(CLASSES_PER_PAGE);
+              }}
+              className="pl-10"
+            />
+          </div>
         </div>
 
         {/* View Mode Toggle */}
         {viewMode === "calendar" ? (
           <ClassCalendarView
-            sessions={filteredSessions.map(s => ({
+            sessions={allSessions.map(s => ({
               id: s.id,
               name: s.name,
               instructor: s.instructor,
               start_time: s.start_time,
               end_time: s.end_time,
               capacity: s.capacity,
-              category: s.category,
-              bookedCount: s.bookedCount,
-              availableSpots: s.availableSpots,
-              isBooked: s.isBooked,
             }))}
             onDateClick={(date) => {
               setSelectedDate(date);
             }}
             onSessionClick={(session) => {
-              const fullSession = filteredSessions.find(s => s.id === session.id);
-              if (fullSession) {
-                handleBookClick(fullSession);
+              // Navigate to class detail page if we have class_id
+              const sessionData = allSessions.find(s => s.id === session.id);
+              if (sessionData?.class_id) {
+                navigate(`/classes/${sessionData.class_id}`);
               }
             }}
             selectedDate={selectedDate}
@@ -541,391 +292,65 @@ const Classes = () => {
             onViewModeChange={setCalendarViewMode}
           />
         ) : (
-          /* Classes Grid */
-          filteredSessions.length === 0 ? (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <p className="text-muted-foreground">
-                  {searchQuery || selectedClass !== "all" || selectedCategory !== "all" || selectedInstructor !== "all" || dateFilter !== "upcoming"
-                    ? "No classes match your filters. Try adjusting your search."
-                    : "No classes available at the moment. Check back soon!"}
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredSessions.map((session) => (
-                <ClassCard
-                  key={session.id}
-                  session={session}
-                  onBookClick={handleBookClick}
-                />
-              ))}
+          <>
+            {/* Results Count */}
+            <div className="mb-4 text-sm text-muted-foreground">
+              Showing {visibleClasses.length} of {filteredClasses.length} classes
             </div>
-          )
-        )}
 
-        {/* Booking Confirmation Dialog */}
-        <Dialog open={showBookingDialog} onOpenChange={setShowBookingDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Confirm Booking</DialogTitle>
-              <DialogDescription>
-                Are you sure you want to book this class?
-              </DialogDescription>
-            </DialogHeader>
-            {selectedSession && (
-              <div className="space-y-2 py-4">
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium">Class:</span>
-                  <span className="text-sm">{selectedSession.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium">Instructor:</span>
-                  <span className="text-sm">{selectedSession.instructor || "TBA"}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium">Date & Time:</span>
-                  <span className="text-sm">
-                    {format(parseISO(selectedSession.start_time), "MMM d, yyyy 'at' h:mm a")}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium">Duration:</span>
-                  <span className="text-sm">
-                    {Math.round(
-                      (parseISO(selectedSession.end_time).getTime() -
-                        parseISO(selectedSession.start_time).getTime()) /
-                        60000
-                    )}{" "}
-                    minutes
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm font-medium">Available Spots:</span>
-                  <span className="text-sm">
-                    {selectedSession.availableSpots} of {selectedSession.capacity || 0}
-                  </span>
-                </div>
-              </div>
-            )}
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowBookingDialog(false);
-                  setSelectedSession(null);
-                }}
-                disabled={bookingLoading}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleConfirmBooking} disabled={bookingLoading}>
-                {bookingLoading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Booking...
-                  </>
-                ) : (
-                  "Confirm Booking"
-                )}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Category Sidebar */}
-        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
-            {selectedCategoryForSidebar && (
+            {/* Classes Grid */}
+            {filteredClasses.length === 0 ? (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <p className="text-muted-foreground">
+                    {searchQuery || selectedCategory !== "all"
+                      ? "No classes match your filters. Try adjusting your search."
+                      : "No classes available at the moment. Check back soon!"}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
               <>
-                <SheetHeader className="space-y-4">
-                  {selectedCategoryForSidebar.image_url && (
-                    <div className="relative w-full h-64 rounded-lg overflow-hidden bg-muted">
-                      <img
-                        src={selectedCategoryForSidebar.image_url}
-                        alt={selectedCategoryForSidebar.name}
-                        className="w-full h-full object-cover"
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                  {visibleClasses.map((classItem) => {
+                    const displayImage = classItem.image_url || classItem.class_categories?.image_url;
+                    const categoryName = classItem.class_categories?.name || classItem.category;
+                    
+                    return (
+                      <ClassCard
+                        key={classItem.id}
+                        id={classItem.id}
+                        name={classItem.name}
+                        description={classItem.description}
+                        imageUrl={displayImage}
+                        categoryName={categoryName}
+                        onClick={() => handleClassClick(classItem.id)}
                       />
-                    </div>
-                  )}
-                  <SheetTitle className="text-2xl font-bold">
-                    {selectedCategoryForSidebar.name}
-                  </SheetTitle>
-                  {selectedCategoryForSidebar.description && (
-                    <SheetDescription className="text-base">
-                      {selectedCategoryForSidebar.description}
-                    </SheetDescription>
-                  )}
-                </SheetHeader>
-
-                <div className="mt-8">
-                  <h3 className="text-xl font-semibold mb-4">
-                    {selectedCategoryForSidebar.name} Upcoming Classes
-                  </h3>
-                  
-                  {sidebarSessions.length === 0 ? (
-                    <Card>
-                      <CardContent className="p-8 text-center">
-                        <p className="text-muted-foreground">
-                          No upcoming classes available for this category.
-                        </p>
-                      </CardContent>
-                    </Card>
-                  ) : (
-                    <div className="space-y-4">
-                      {sidebarSessions.map((session) => (
-                        <SidebarClassItem
-                          key={session.id}
-                          session={session}
-                          onBookClick={handleBookClick}
-                        />
-                      ))}
-                    </div>
-                  )}
+                    );
+                  })}
                 </div>
+
+                {/* Load More Button */}
+                {hasMore && (
+                  <div className="flex justify-center mt-8">
+                    <Button
+                      onClick={handleLoadMore}
+                      variant="outline"
+                      size="lg"
+                      className="min-w-[200px]"
+                    >
+                      Load More
+                    </Button>
+                  </div>
+                )}
               </>
             )}
-          </SheetContent>
-        </Sheet>
+          </>
+        )}
       </div>
     </div>
   );
 };
 
-interface SidebarClassItemProps {
-  session: ClassSessionWithAvailability;
-  onBookClick: (session: ClassSessionWithAvailability) => void;
-}
-
-const SidebarClassItem = ({ session, onBookClick }: SidebarClassItemProps) => {
-  const startTime = parseISO(session.start_time);
-  const endTime = parseISO(session.end_time);
-  const duration = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
-
-  const isFullyBooked = session.availableSpots === 0;
-  const isLowAvailability = session.availableSpots > 0 && session.availableSpots <= 3;
-
-  return (
-    <Card className="hover:shadow-md transition-shadow">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 space-y-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <CardTitle className="text-lg">{session.name}</CardTitle>
-              {isFullyBooked && <Badge variant="destructive" className="text-xs">Full</Badge>}
-              {isLowAvailability && !isFullyBooked && (
-                <Badge variant="secondary" className="text-xs">Few Spots</Badge>
-              )}
-              {session.isBooked && <Badge variant="default" className="text-xs">Booked</Badge>}
-            </div>
-            
-            {session.instructor && (
-              <CardDescription className="text-sm">
-                with {session.instructor}
-              </CardDescription>
-            )}
-
-            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1.5">
-                <Calendar className="w-4 h-4" />
-                <span>{format(startTime, "MMM d, yyyy 'at' h:mm a")}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-4 h-4" />
-                <span>{duration} min</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Users className="w-4 h-4" />
-                <span>{session.availableSpots} of {session.capacity || 0} spots</span>
-              </div>
-            </div>
-          </div>
-
-          <Button
-            size="sm"
-            onClick={() => onBookClick(session)}
-            disabled={session.isBooked || isFullyBooked || session.isPast}
-            variant={session.isBooked ? "secondary" : "default"}
-            className="shrink-0"
-          >
-            {session.isBooked
-              ? "Booked"
-              : isFullyBooked
-              ? "Full"
-              : session.isPast
-              ? "Past"
-              : "Book"}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-interface CategoryCardProps {
-  category: ClassCategory;
-  onClick: () => void;
-}
-
-const CategoryCard = ({ category, onClick }: CategoryCardProps) => {
-  return (
-    <Card 
-      className="hover:shadow-lg transition-shadow overflow-hidden flex flex-col group cursor-pointer"
-      onClick={onClick}
-    >
-      {category.image_url && (
-        <div className="relative h-64 w-full overflow-hidden bg-muted">
-          <img
-            src={category.image_url}
-            alt={category.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        </div>
-      )}
-      <CardHeader className={category.image_url ? "" : "pb-2"}>
-        <CardTitle className="text-xl">{category.name}</CardTitle>
-        {category.description && (
-          <CardDescription className="text-base line-clamp-3">
-            {category.description}
-          </CardDescription>
-        )}
-      </CardHeader>
-      <CardContent className="flex-1 flex flex-col">
-        <Button
-          className="w-full mt-auto"
-          variant="default"
-          size="lg"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClick();
-          }}
-        >
-          View Classes
-        </Button>
-      </CardContent>
-    </Card>
-  );
-};
-
-interface ClassCardProps {
-  session: ClassSessionWithAvailability;
-  onBookClick: (session: ClassSessionWithAvailability) => void;
-}
-
-const ClassCard = ({ session, onBookClick }: ClassCardProps) => {
-  const startTime = parseISO(session.start_time);
-  const endTime = parseISO(session.end_time);
-  const duration = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
-
-  const isFullyBooked = session.availableSpots === 0;
-  const isLowAvailability = session.availableSpots > 0 && session.availableSpots <= 3;
-
-  // Get image from class or category
-  const classImage = (session.classes as any)?.image_url;
-  const categoryImage = (session.classes as any)?.class_categories?.image_url;
-  const displayImage = classImage || categoryImage;
-
-  // Get description
-  const description = (session.classes as any)?.description;
-
-  return (
-    <Card className="group relative overflow-hidden flex flex-col border border-border/50 shadow-sm hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2 bg-card rounded-xl">
-      {/* Glow effect on hover */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/0 via-primary/0 to-primary/0 group-hover:from-primary/5 group-hover:via-primary/10 group-hover:to-primary/5 transition-all duration-500 rounded-xl -z-10" />
-      
-      {displayImage && (
-        <div className="relative h-72 w-full overflow-hidden bg-muted">
-          {/* Overlay gradient on hover */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10" />
-          
-          <img
-            src={displayImage}
-            alt={session.name}
-            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
-          />
-          
-          {/* Badges overlay */}
-          <div className="absolute top-3 right-3 flex gap-2 z-20">
-            {isFullyBooked && (
-              <Badge variant="destructive" className="backdrop-blur-sm bg-destructive/90">
-                Full
-              </Badge>
-            )}
-            {isLowAvailability && !isFullyBooked && (
-              <Badge variant="secondary" className="backdrop-blur-sm bg-secondary/90">
-                Few Spots Left
-              </Badge>
-            )}
-            {session.isBooked && (
-              <Badge variant="default" className="backdrop-blur-sm bg-primary/90">
-                Booked
-              </Badge>
-            )}
-          </div>
-        </div>
-      )}
-      
-      <CardHeader className={`${displayImage ? "pt-6" : "pt-6 pb-2"}`}>
-        {!displayImage && (
-          <div className="flex items-start justify-between mb-3">
-            {isFullyBooked && <Badge variant="destructive">Full</Badge>}
-            {isLowAvailability && !isFullyBooked && (
-              <Badge variant="secondary">Few Spots Left</Badge>
-            )}
-            {session.isBooked && <Badge variant="default">Booked</Badge>}
-          </div>
-        )}
-        <CardTitle className="text-2xl font-bold mb-2 group-hover:text-primary transition-colors duration-300">
-          {session.name}
-        </CardTitle>
-        <CardDescription className="text-base text-muted-foreground">
-          {session.instructor ? `with ${session.instructor}` : "Instructor TBA"}
-        </CardDescription>
-      </CardHeader>
-      
-      <CardContent className="space-y-4 flex-1 flex flex-col pb-6">
-        {description && (
-          <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
-            {description}
-          </p>
-        )}
-        
-        <div className="space-y-3 text-sm">
-          <div className="flex items-center gap-2.5 text-muted-foreground">
-            <Calendar className="w-4 h-4 text-primary/70" />
-            <span className="font-medium">{format(startTime, "MMM d, yyyy 'at' h:mm a")}</span>
-          </div>
-          <div className="flex items-center gap-2.5 text-muted-foreground">
-            <Clock className="w-4 h-4 text-primary/70" />
-            <span>{duration} minutes</span>
-          </div>
-          <div className="flex items-center gap-2.5 text-muted-foreground">
-            <Users className="w-4 h-4 text-primary/70" />
-            <span>
-              {session.availableSpots} of {session.capacity || 0} spots available
-            </span>
-          </div>
-        </div>
-        
-        <Button
-          className="w-full mt-auto group-hover:shadow-lg group-hover:shadow-primary/20 group-hover:scale-[1.02] transition-all duration-300 font-semibold"
-          onClick={() => onBookClick(session)}
-          disabled={session.isBooked || isFullyBooked || session.isPast}
-          variant={session.isBooked ? "secondary" : "default"}
-          size="lg"
-        >
-          {session.isBooked
-            ? "Already Booked"
-            : isFullyBooked
-            ? "Fully Booked"
-            : session.isPast
-            ? "Past Class"
-            : "Book Class"}
-        </Button>
-      </CardContent>
-    </Card>
-  );
-};
 
 export default Classes;

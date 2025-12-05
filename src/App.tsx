@@ -16,6 +16,7 @@ import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Classes from "./pages/Classes";
+import ClassDetail from "./pages/ClassDetail";
 import Bookings from "./pages/Bookings";
 import EntryExit from "./pages/EntryExit";
 import AdminDashboard from "./pages/AdminDashboard";
@@ -109,6 +110,14 @@ const App = () => {
               element={
                 <ProtectedRoute>
                   <Classes />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/classes/:classId"
+              element={
+                <ProtectedRoute>
+                  <ClassDetail />
                 </ProtectedRoute>
               }
             />
