@@ -14,6 +14,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -99,6 +106,8 @@ const Classes = () => {
   const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid");
   const [calendarViewMode, setCalendarViewMode] = useState<"daily" | "weekly" | "monthly">("weekly");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [selectedCategoryForSidebar, setSelectedCategoryForSidebar] = useState<ClassCategory | null>(null);
   
   const { toast } = useToast();
   const { bookings, createBooking, refreshBookings } = useBookings();
@@ -121,7 +130,7 @@ const Classes = () => {
         .order("name", { ascending: true });
 
       if (categoriesError) throw categoriesError;
-      setCategories((categoriesData || []) as ClassCategory[]);
+      setCategories((categoriesData || []) as unknown as ClassCategory[]);
       
       // Fetch upcoming class sessions with class data and category info
       const { data: sessionsData, error: sessionsError } = await supabase
@@ -278,6 +287,17 @@ const Classes = () => {
     return filtered;
   }, [sessionsWithAvailability, searchQuery, selectedClass, selectedCategory, selectedInstructor, dateFilter]);
 
+  // Filter sessions for sidebar (by selected category)
+  const sidebarSessions = useMemo(() => {
+    if (!selectedCategoryForSidebar) return [];
+    
+    return sessionsWithAvailability.filter(session => {
+      const sessionCategoryId = (session.classes as any)?.category_id;
+      const sessionCategoryName = (session.classes as any)?.category || session.category;
+      return sessionCategoryId === selectedCategoryForSidebar.id || sessionCategoryName === selectedCategoryForSidebar.name;
+    });
+  }, [sessionsWithAvailability, selectedCategoryForSidebar]);
+
   const handleBookClick = (session: ClassSessionWithAvailability) => {
     if (session.isBooked) {
       toast(toastMessages.alreadyBooked());
@@ -374,7 +394,10 @@ const Classes = () => {
                 key={category.id}
                 variant={selectedCategory === category.id ? "default" : "outline"}
                 size="sm"
-                onClick={() => setSelectedCategory(category.id)}
+                onClick={() => {
+                  setSelectedCategoryForSidebar(category);
+                  setSidebarOpen(true);
+                }}
                 className="rounded-full"
               >
                 {category.name}
@@ -610,8 +633,178 @@ const Classes = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Category Sidebar */}
+        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+            {selectedCategoryForSidebar && (
+              <>
+                <SheetHeader className="space-y-4">
+                  {selectedCategoryForSidebar.image_url && (
+                    <div className="relative w-full h-64 rounded-lg overflow-hidden bg-muted">
+                      <img
+                        src={selectedCategoryForSidebar.image_url}
+                        alt={selectedCategoryForSidebar.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <SheetTitle className="text-2xl font-bold">
+                    {selectedCategoryForSidebar.name}
+                  </SheetTitle>
+                  {selectedCategoryForSidebar.description && (
+                    <SheetDescription className="text-base">
+                      {selectedCategoryForSidebar.description}
+                    </SheetDescription>
+                  )}
+                </SheetHeader>
+
+                <div className="mt-8">
+                  <h3 className="text-xl font-semibold mb-4">
+                    {selectedCategoryForSidebar.name} Upcoming Classes
+                  </h3>
+                  
+                  {sidebarSessions.length === 0 ? (
+                    <Card>
+                      <CardContent className="p-8 text-center">
+                        <p className="text-muted-foreground">
+                          No upcoming classes available for this category.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-4">
+                      {sidebarSessions.map((session) => (
+                        <SidebarClassItem
+                          key={session.id}
+                          session={session}
+                          onBookClick={handleBookClick}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </SheetContent>
+        </Sheet>
       </div>
     </div>
+  );
+};
+
+interface SidebarClassItemProps {
+  session: ClassSessionWithAvailability;
+  onBookClick: (session: ClassSessionWithAvailability) => void;
+}
+
+const SidebarClassItem = ({ session, onBookClick }: SidebarClassItemProps) => {
+  const startTime = parseISO(session.start_time);
+  const endTime = parseISO(session.end_time);
+  const duration = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
+
+  const isFullyBooked = session.availableSpots === 0;
+  const isLowAvailability = session.availableSpots > 0 && session.availableSpots <= 3;
+
+  return (
+    <Card className="hover:shadow-md transition-shadow">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <CardTitle className="text-lg">{session.name}</CardTitle>
+              {isFullyBooked && <Badge variant="destructive" className="text-xs">Full</Badge>}
+              {isLowAvailability && !isFullyBooked && (
+                <Badge variant="secondary" className="text-xs">Few Spots</Badge>
+              )}
+              {session.isBooked && <Badge variant="default" className="text-xs">Booked</Badge>}
+            </div>
+            
+            {session.instructor && (
+              <CardDescription className="text-sm">
+                with {session.instructor}
+              </CardDescription>
+            )}
+
+            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <Calendar className="w-4 h-4" />
+                <span>{format(startTime, "MMM d, yyyy 'at' h:mm a")}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-4 h-4" />
+                <span>{duration} min</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Users className="w-4 h-4" />
+                <span>{session.availableSpots} of {session.capacity || 0} spots</span>
+              </div>
+            </div>
+          </div>
+
+          <Button
+            size="sm"
+            onClick={() => onBookClick(session)}
+            disabled={session.isBooked || isFullyBooked || session.isPast}
+            variant={session.isBooked ? "secondary" : "default"}
+            className="shrink-0"
+          >
+            {session.isBooked
+              ? "Booked"
+              : isFullyBooked
+              ? "Full"
+              : session.isPast
+              ? "Past"
+              : "Book"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+interface CategoryCardProps {
+  category: ClassCategory;
+  onClick: () => void;
+}
+
+const CategoryCard = ({ category, onClick }: CategoryCardProps) => {
+  return (
+    <Card 
+      className="hover:shadow-lg transition-shadow overflow-hidden flex flex-col group cursor-pointer"
+      onClick={onClick}
+    >
+      {category.image_url && (
+        <div className="relative h-64 w-full overflow-hidden bg-muted">
+          <img
+            src={category.image_url}
+            alt={category.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        </div>
+      )}
+      <CardHeader className={category.image_url ? "" : "pb-2"}>
+        <CardTitle className="text-xl">{category.name}</CardTitle>
+        {category.description && (
+          <CardDescription className="text-base line-clamp-3">
+            {category.description}
+          </CardDescription>
+        )}
+      </CardHeader>
+      <CardContent className="flex-1 flex flex-col">
+        <Button
+          className="w-full mt-auto"
+          variant="default"
+          size="lg"
+          onClick={(e) => {
+            e.stopPropagation();
+            onClick();
+          }}
+        >
+          View Classes
+        </Button>
+      </CardContent>
+    </Card>
   );
 };
 
@@ -637,26 +830,45 @@ const ClassCard = ({ session, onBookClick }: ClassCardProps) => {
   const description = (session.classes as any)?.description;
 
   return (
-    <Card className="hover:shadow-lg transition-shadow overflow-hidden flex flex-col group">
+    <Card className="group relative overflow-hidden flex flex-col border border-border/50 shadow-sm hover:shadow-2xl hover:shadow-primary/10 transition-all duration-500 hover:-translate-y-2 bg-card rounded-xl">
+      {/* Glow effect on hover */}
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/0 via-primary/0 to-primary/0 group-hover:from-primary/5 group-hover:via-primary/10 group-hover:to-primary/5 transition-all duration-500 rounded-xl -z-10" />
+      
       {displayImage && (
-        <div className="relative h-48 w-full overflow-hidden bg-muted">
+        <div className="relative h-72 w-full overflow-hidden bg-muted">
+          {/* Overlay gradient on hover */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10" />
+          
           <img
             src={displayImage}
             alt={session.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out"
           />
-          <div className="absolute top-2 right-2 flex gap-2">
-            {isFullyBooked && <Badge variant="destructive">Full</Badge>}
-            {isLowAvailability && !isFullyBooked && (
-              <Badge variant="secondary">Few Spots Left</Badge>
+          
+          {/* Badges overlay */}
+          <div className="absolute top-3 right-3 flex gap-2 z-20">
+            {isFullyBooked && (
+              <Badge variant="destructive" className="backdrop-blur-sm bg-destructive/90">
+                Full
+              </Badge>
             )}
-            {session.isBooked && <Badge variant="default">Booked</Badge>}
+            {isLowAvailability && !isFullyBooked && (
+              <Badge variant="secondary" className="backdrop-blur-sm bg-secondary/90">
+                Few Spots Left
+              </Badge>
+            )}
+            {session.isBooked && (
+              <Badge variant="default" className="backdrop-blur-sm bg-primary/90">
+                Booked
+              </Badge>
+            )}
           </div>
         </div>
       )}
-      <CardHeader className={displayImage ? "" : "pb-2"}>
+      
+      <CardHeader className={`${displayImage ? "pt-6" : "pt-6 pb-2"}`}>
         {!displayImage && (
-          <div className="flex items-start justify-between mb-2">
+          <div className="flex items-start justify-between mb-3">
             {isFullyBooked && <Badge variant="destructive">Full</Badge>}
             {isLowAvailability && !isFullyBooked && (
               <Badge variant="secondary">Few Spots Left</Badge>
@@ -664,33 +876,40 @@ const ClassCard = ({ session, onBookClick }: ClassCardProps) => {
             {session.isBooked && <Badge variant="default">Booked</Badge>}
           </div>
         )}
-        <CardTitle className="text-xl">{session.name}</CardTitle>
-        <CardDescription className="text-base">
+        <CardTitle className="text-2xl font-bold mb-2 group-hover:text-primary transition-colors duration-300">
+          {session.name}
+        </CardTitle>
+        <CardDescription className="text-base text-muted-foreground">
           {session.instructor ? `with ${session.instructor}` : "Instructor TBA"}
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4 flex-1 flex flex-col">
+      
+      <CardContent className="space-y-4 flex-1 flex flex-col pb-6">
         {description && (
-          <p className="text-sm text-muted-foreground line-clamp-2">{description}</p>
+          <p className="text-sm text-muted-foreground line-clamp-3 leading-relaxed">
+            {description}
+          </p>
         )}
-        <div className="space-y-2 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4" />
-            <span>{format(startTime, "MMM d, yyyy 'at' h:mm a")}</span>
+        
+        <div className="space-y-3 text-sm">
+          <div className="flex items-center gap-2.5 text-muted-foreground">
+            <Calendar className="w-4 h-4 text-primary/70" />
+            <span className="font-medium">{format(startTime, "MMM d, yyyy 'at' h:mm a")}</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4" />
+          <div className="flex items-center gap-2.5 text-muted-foreground">
+            <Clock className="w-4 h-4 text-primary/70" />
             <span>{duration} minutes</span>
           </div>
-          <div className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
+          <div className="flex items-center gap-2.5 text-muted-foreground">
+            <Users className="w-4 h-4 text-primary/70" />
             <span>
               {session.availableSpots} of {session.capacity || 0} spots available
             </span>
           </div>
         </div>
+        
         <Button
-          className="w-full mt-auto"
+          className="w-full mt-auto group-hover:shadow-lg group-hover:shadow-primary/20 group-hover:scale-[1.02] transition-all duration-300 font-semibold"
           onClick={() => onBookClick(session)}
           disabled={session.isBooked || isFullyBooked || session.isPast}
           variant={session.isBooked ? "secondary" : "default"}
