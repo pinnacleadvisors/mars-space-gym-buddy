@@ -38,6 +38,18 @@ interface Class {
   id: string;
   name: string;
   category: string | null;
+  category_id: string | null;
+  description: string | null;
+  image_url: string | null;
+}
+
+interface ClassCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  image_url: string | null;
+  is_active: boolean;
+  display_order: number;
 }
 
 interface ClassSession {
@@ -52,6 +64,14 @@ interface ClassSession {
   classes?: {
     name: string;
     category: string | null;
+    category_id: string | null;
+    description: string | null;
+    image_url: string | null;
+    class_categories?: {
+      id: string;
+      name: string;
+      image_url: string | null;
+    };
   };
 }
 
@@ -66,6 +86,7 @@ interface ClassSessionWithAvailability extends ClassSession {
 const Classes = () => {
   const [sessions, setSessions] = useState<ClassSession[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
+  const [categories, setCategories] = useState<ClassCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
@@ -75,7 +96,7 @@ const Classes = () => {
   const [selectedSession, setSelectedSession] = useState<ClassSessionWithAvailability | null>(null);
   const [showBookingDialog, setShowBookingDialog] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<"grid" | "calendar">("calendar");
+  const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid");
   const [calendarViewMode, setCalendarViewMode] = useState<"daily" | "weekly" | "monthly">("weekly");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   
@@ -91,31 +112,50 @@ const Classes = () => {
       setLoading(true);
       const now = new Date().toISOString();
       
-      // Fetch upcoming class sessions with class data
+      // Fetch categories
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from("class_categories" as any)
+        .select("*")
+        .eq("is_active", true)
+        .order("display_order", { ascending: true })
+        .order("name", { ascending: true });
+
+      if (categoriesError) throw categoriesError;
+      setCategories((categoriesData || []) as ClassCategory[]);
+      
+      // Fetch upcoming class sessions with class data and category info
       const { data: sessionsData, error: sessionsError } = await supabase
         .from("class_sessions")
         .select(`
           *,
           classes (
             name,
-            category
+            category,
+            category_id,
+            description,
+            image_url,
+            class_categories (
+              id,
+              name,
+              image_url
+            )
           )
         `)
         .gte("start_time", now)
         .order("start_time", { ascending: true });
 
       if (sessionsError) throw sessionsError;
-      setSessions(sessionsData || []);
+      setSessions((sessionsData || []) as ClassSession[]);
 
       // Fetch all classes for filter
       const { data: classesData, error: classesError } = await supabase
         .from("classes")
-        .select("id, name, category")
+        .select("id, name, category, category_id, description, image_url")
         .eq("is_active", true)
         .order("name", { ascending: true });
 
       if (classesError) throw classesError;
-      setClasses(classesData || []);
+      setClasses((classesData || []) as Class[]);
     } catch (error: any) {
       showErrorToast({
         title: "Error",
@@ -132,16 +172,21 @@ const Classes = () => {
     return unique.sort();
   }, [sessions]);
 
-  const categories = useMemo(() => {
+  // Use categories from database, fallback to extracted categories from sessions
+  const availableCategories = useMemo(() => {
+    if (categories.length > 0) {
+      return categories;
+    }
+    // Fallback: extract from sessions
     const unique = Array.from(
       new Set(
         sessions
-          .map(s => s.classes?.category || null)
+          .map(s => (s.classes as any)?.category || (s.classes as any)?.category_id || null)
           .filter(Boolean)
       )
     );
-    return unique.sort();
-  }, [sessions]);
+    return unique.map((cat) => ({ id: cat, name: cat, description: null, image_url: null, is_active: true, display_order: 0 } as ClassCategory)).sort((a, b) => a.name.localeCompare(b.name));
+  }, [categories, sessions]);
 
   const classNames = useMemo(() => {
     return classes.map(c => c.name).sort();
@@ -173,7 +218,7 @@ const Classes = () => {
         availableSpots,
         isBooked,
         isPast,
-        category: session.classes?.category || null,
+        category: (session.classes as any)?.category || (session.classes as any)?.class_categories?.name || null,
       };
     });
   }, [sessions, bookings]);
@@ -200,7 +245,11 @@ const Classes = () => {
 
     // Category filter
     if (selectedCategory !== "all") {
-      filtered = filtered.filter(session => session.category === selectedCategory);
+      filtered = filtered.filter(session => {
+        const sessionCategoryId = (session.classes as any)?.category_id;
+        const sessionCategoryName = (session.classes as any)?.category || session.category;
+        return sessionCategoryId === selectedCategory || sessionCategoryName === selectedCategory;
+      });
     }
 
     // Instructor filter
@@ -295,10 +344,47 @@ const Classes = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="container mx-auto max-w-7xl">
-        <div className="flex items-center justify-between mb-8">
-          <h1 className="text-3xl font-bold">Available Classes</h1>
+    <div className="min-h-screen bg-background">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-b from-primary/10 to-background py-12 px-6">
+        <div className="container mx-auto max-w-7xl text-center">
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">
+            Award-winning classes led by the best instructors
+          </h1>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Move with purpose, train together, feel the energy.
+          </p>
+        </div>
+      </div>
+
+      <div className="container mx-auto max-w-7xl p-6">
+        {/* Category Filter Buttons */}
+        <div className="mb-8">
+          <div className="flex flex-wrap gap-2 justify-center md:justify-start">
+            <Button
+              variant={selectedCategory === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedCategory("all")}
+              className="rounded-full"
+            >
+              All
+            </Button>
+            {availableCategories.map((category) => (
+              <Button
+                key={category.id}
+                variant={selectedCategory === category.id ? "default" : "outline"}
+                size="sm"
+                onClick={() => setSelectedCategory(category.id)}
+                className="rounded-full"
+              >
+                {category.name}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-semibold">Available Classes</h2>
           <div className="flex items-center gap-2">
             <Button
               variant={viewMode === "grid" ? "default" : "outline"}
@@ -542,41 +628,73 @@ const ClassCard = ({ session, onBookClick }: ClassCardProps) => {
   const isFullyBooked = session.availableSpots === 0;
   const isLowAvailability = session.availableSpots > 0 && session.availableSpots <= 3;
 
+  // Get image from class or category
+  const classImage = (session.classes as any)?.image_url;
+  const categoryImage = (session.classes as any)?.class_categories?.image_url;
+  const displayImage = classImage || categoryImage;
+
+  // Get description
+  const description = (session.classes as any)?.description;
+
   return (
-    <Card className="hover:shadow-lg transition-shadow overflow-hidden flex flex-col">
-      <CardHeader>
-        <div className="flex items-start justify-between mb-2">
-          {isFullyBooked && <Badge variant="destructive">Full</Badge>}
-          {isLowAvailability && !isFullyBooked && (
-            <Badge variant="secondary">Few Spots Left</Badge>
-          )}
-          {session.isBooked && <Badge variant="default">Booked</Badge>}
+    <Card className="hover:shadow-lg transition-shadow overflow-hidden flex flex-col group">
+      {displayImage && (
+        <div className="relative h-48 w-full overflow-hidden bg-muted">
+          <img
+            src={displayImage}
+            alt={session.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+          <div className="absolute top-2 right-2 flex gap-2">
+            {isFullyBooked && <Badge variant="destructive">Full</Badge>}
+            {isLowAvailability && !isFullyBooked && (
+              <Badge variant="secondary">Few Spots Left</Badge>
+            )}
+            {session.isBooked && <Badge variant="default">Booked</Badge>}
+          </div>
         </div>
-        <CardTitle>{session.name}</CardTitle>
-        <CardDescription>
+      )}
+      <CardHeader className={displayImage ? "" : "pb-2"}>
+        {!displayImage && (
+          <div className="flex items-start justify-between mb-2">
+            {isFullyBooked && <Badge variant="destructive">Full</Badge>}
+            {isLowAvailability && !isFullyBooked && (
+              <Badge variant="secondary">Few Spots Left</Badge>
+            )}
+            {session.isBooked && <Badge variant="default">Booked</Badge>}
+          </div>
+        )}
+        <CardTitle className="text-xl">{session.name}</CardTitle>
+        <CardDescription className="text-base">
           {session.instructor ? `with ${session.instructor}` : "Instructor TBA"}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 flex-1 flex flex-col">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Calendar className="w-4 h-4" />
-          <span>{format(startTime, "MMM d, yyyy 'at' h:mm a")}</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Clock className="w-4 h-4" />
-          <span>{duration} minutes</span>
-        </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Users className="w-4 h-4" />
-          <span>
-            {session.availableSpots} of {session.capacity || 0} spots available
-          </span>
+        {description && (
+          <p className="text-sm text-muted-foreground line-clamp-2">{description}</p>
+        )}
+        <div className="space-y-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            <span>{format(startTime, "MMM d, yyyy 'at' h:mm a")}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Clock className="w-4 h-4" />
+            <span>{duration} minutes</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            <span>
+              {session.availableSpots} of {session.capacity || 0} spots available
+            </span>
+          </div>
         </div>
         <Button
           className="w-full mt-auto"
           onClick={() => onBookClick(session)}
           disabled={session.isBooked || isFullyBooked || session.isPast}
           variant={session.isBooked ? "secondary" : "default"}
+          size="lg"
         >
           {session.isBooked
             ? "Already Booked"

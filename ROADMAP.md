@@ -323,7 +323,7 @@ This roadmap outlines all tasks needed to make the application fully functional.
 ---
 
 ### 4.4 Admin Panel Enhancements
-**Status**: ⚠️ Basic Implementation
+**Status**: ✅ Fully Implemented
 
 #### Tasks:
 - [x] **User Management**
@@ -344,6 +344,22 @@ This roadmap outlines all tasks needed to make the application fully functional.
   - [x] Add bulk session creation
   - [x] Implement class capacity management
   - [x] Add instructor management
+  - [x] **Category Management**
+    - [x] Add categories tab to AdminManageClasses page
+    - [x] Create/edit/delete categories with image and description
+    - [x] Category image upload to Supabase Storage
+    - [x] Display order management for categories
+    - [x] Active/inactive toggle for categories
+    - [x] Prevent deletion of categories in use by classes
+  - [x] **Class Image Upload**
+    - [x] Add image upload field to class creation/editing forms
+    - [x] Upload class images to Supabase Storage
+    - [x] Image preview functionality
+    - [x] Support both file upload and URL input
+  - [x] **Category Dropdown**
+    - [x] Replace category text input with dropdown select from class_categories table
+    - [x] Show active categories in dropdown
+    - [x] Maintain backward compatibility with legacy category text field
 
 **Dependencies**: Admin authentication  
 **Estimated Effort**: 3-4 days

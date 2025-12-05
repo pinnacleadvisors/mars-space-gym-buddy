@@ -50,6 +50,9 @@ import {
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { categorySchema, type CategoryFormData } from "@/lib/validations/class";
+import { uploadCategoryImage, uploadClassImage, deleteImage } from "@/lib/utils/imageUpload";
+import { Upload, X, Image as ImageIcon } from "lucide-react";
 
 // Form validation schemas
 const classSchema = z.object({
@@ -60,6 +63,7 @@ const classSchema = z.object({
   duration: z.number().min(1, "Duration must be at least 1 minute").max(480, "Duration cannot exceed 8 hours"),
   capacity: z.number().min(1, "Capacity must be at least 1").max(1000, "Capacity cannot exceed 1000"),
   category: z.string().optional(),
+  category_id: z.string().uuid("Invalid category ID").optional().nullable(),
   image_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   is_active: z.boolean(),
 });
@@ -86,6 +90,7 @@ interface Class {
   duration: number;
   capacity: number;
   category: string | null;
+  category_id: string | null;
   image_url: string | null;
   is_active: boolean;
   created_at?: string;
@@ -118,6 +123,17 @@ interface Instructor {
   session_count: number;
 }
 
+interface ClassCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  image_url: string | null;
+  is_active: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
 const AdminManageClasses = () => {
   const { toast } = useToast();
   const [classes, setClasses] = useState<Class[]>([]);
@@ -140,7 +156,17 @@ const AdminManageClasses = () => {
   const [sessionInstructorFilter, setSessionInstructorFilter] = useState<string>("all");
   const [sessionClassFilter, setSessionClassFilter] = useState<string>("all");
   const [sessionCategoryFilter, setSessionCategoryFilter] = useState<string>("all");
-  const [activeTab, setActiveTab] = useState<"classes" | "sessions" | "instructors" | "calendar">("classes");
+  const [activeTab, setActiveTab] = useState<"classes" | "sessions" | "instructors" | "calendar" | "categories">("classes");
+  const [classCategories, setClassCategories] = useState<ClassCategory[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<ClassCategory | null>(null);
+  const [categoryImageFile, setCategoryImageFile] = useState<File | null>(null);
+  const [categoryImagePreview, setCategoryImagePreview] = useState<string | null>(null);
+  const [uploadingCategoryImage, setUploadingCategoryImage] = useState(false);
+  const [classImageFile, setClassImageFile] = useState<File | null>(null);
+  const [classImagePreview, setClassImagePreview] = useState<string | null>(null);
+  const [uploadingClassImage, setUploadingClassImage] = useState(false);
 
   const classForm = useForm<ClassFormData>({
     resolver: zodResolver(classSchema),
@@ -170,10 +196,22 @@ const AdminManageClasses = () => {
     },
   });
 
+  const categoryForm = useForm<CategoryFormData>({
+    resolver: zodResolver(categorySchema),
+    defaultValues: {
+      name: "",
+      description: "",
+      image_url: "",
+      is_active: true,
+      display_order: 0,
+    },
+  });
+
   useEffect(() => {
     fetchClasses();
     fetchSessions();
     fetchInstructors();
+    fetchCategories();
   }, []);
 
   const fetchClasses = async () => {
@@ -286,6 +324,196 @@ const AdminManageClasses = () => {
     }
   };
 
+  const fetchCategories = async () => {
+    try {
+      setCategoriesLoading(true);
+      const { data, error } = await supabase
+        .from("class_categories" as any)
+        .select("*")
+        .order("display_order", { ascending: true })
+        .order("name", { ascending: true });
+
+      if (error) throw error;
+      setClassCategories((data || []) as unknown as ClassCategory[]);
+    } catch (error: any) {
+      showErrorToast({
+        title: "Error loading categories",
+        description: error.message,
+      });
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
+
+  const handleCategoryImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      showErrorToast({
+        title: "Invalid file type",
+        description: "Please upload an image file.",
+      });
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      showErrorToast({
+        title: "File too large",
+        description: "Please upload an image smaller than 5MB.",
+      });
+      return;
+    }
+
+    setCategoryImageFile(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setCategoryImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCategorySubmit = async (data: CategoryFormData) => {
+    try {
+      let imageUrl = data.image_url || "";
+
+      // Upload new image if provided
+      if (categoryImageFile && editingCategory) {
+        setUploadingCategoryImage(true);
+        imageUrl = await uploadCategoryImage(categoryImageFile, editingCategory.id);
+      } else if (categoryImageFile && !editingCategory) {
+        // For new categories, we need to create the category first to get an ID
+        // So we'll handle this after creation
+        const tempId = `temp-${Date.now()}`;
+        setUploadingCategoryImage(true);
+        imageUrl = await uploadCategoryImage(categoryImageFile, tempId);
+      }
+
+      if (editingCategory) {
+        // Delete old image if new one is uploaded
+        if (categoryImageFile && editingCategory.image_url) {
+          await deleteImage(editingCategory.image_url, "category-images");
+        }
+
+        const { error } = await supabase
+          .from("class_categories" as any)
+          .update({
+            ...data,
+            image_url: imageUrl || null,
+          })
+          .eq("id", editingCategory.id);
+
+        if (error) throw error;
+        showSuccessToast("Category updated successfully");
+      } else {
+        // Create new category
+        const { data: newCategory, error } = await supabase
+          .from("class_categories" as any)
+          .insert([{
+            ...data,
+            image_url: imageUrl || null,
+          }])
+          .select()
+          .single();
+
+        if (error) throw error;
+
+        // If we uploaded with temp ID, re-upload with real ID
+        if (categoryImageFile && newCategory && (newCategory as any).id) {
+          const realImageUrl = await uploadCategoryImage(categoryImageFile, (newCategory as any).id);
+          await supabase
+            .from("class_categories" as any)
+            .update({ image_url: realImageUrl })
+            .eq("id", (newCategory as any).id);
+        }
+
+        showSuccessToast("Category created successfully");
+      }
+
+      setCategoryDialogOpen(false);
+      categoryForm.reset();
+      setEditingCategory(null);
+      setCategoryImageFile(null);
+      setCategoryImagePreview(null);
+      await fetchCategories();
+      await fetchClasses(); // Refresh classes to get updated category data
+    } catch (error: any) {
+      showErrorToast({
+        title: "Error",
+        description: error.message,
+      });
+    } finally {
+      setUploadingCategoryImage(false);
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    // Check if category is used by any classes
+    const { data: classesUsingCategory, error: checkError } = await supabase
+      .from("classes")
+      .select("id, name")
+      .eq("category_id", id)
+      .limit(1);
+
+    if (checkError) {
+      showErrorToast({
+        title: "Error",
+        description: checkError.message,
+      });
+      return;
+    }
+
+    if (classesUsingCategory && classesUsingCategory.length > 0) {
+      showErrorToast({
+        title: "Cannot delete category",
+        description: `This category is used by ${classesUsingCategory.length} class(es). Please remove the category from all classes first.`,
+      });
+      return;
+    }
+
+    if (!confirm("Are you sure you want to delete this category? This action cannot be undone.")) return;
+
+    try {
+      // Get category to delete image
+      const category = classCategories.find((c) => c.id === id);
+      if (category?.image_url) {
+        await deleteImage(category.image_url, "category-images");
+      }
+
+      const { error } = await supabase
+        .from("class_categories" as any)
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      showSuccessToast("Category deleted successfully");
+      await fetchCategories();
+    } catch (error: any) {
+      showErrorToast({
+        title: "Error",
+        description: error.message,
+      });
+    }
+  };
+
+  const handleEditCategory = (category: ClassCategory) => {
+    setEditingCategory(category);
+    categoryForm.reset({
+      name: category.name,
+      description: category.description || "",
+      image_url: category.image_url || "",
+      is_active: category.is_active,
+      display_order: category.display_order,
+    });
+    setCategoryImagePreview(category.image_url || null);
+    setCategoryImageFile(null);
+    setCategoryDialogOpen(true);
+  };
+
   const filteredClasses = useMemo(() => {
     return classes.filter((classItem) => {
       const matchesSearch =
@@ -301,7 +529,7 @@ const AdminManageClasses = () => {
     });
   }, [classes, searchQuery, categoryFilter, instructorFilter]);
 
-  const categories = useMemo(() => {
+  const categoryNames = useMemo(() => {
     const cats = new Set<string>();
     classes.forEach((c) => {
       if (c.category) cats.add(c.category);
@@ -314,7 +542,7 @@ const AdminManageClasses = () => {
     return sessions.filter((session) => {
       const matchesInstructor = sessionInstructorFilter === "all" || session.instructor === sessionInstructorFilter;
       const matchesClass = sessionClassFilter === "all" || session.classes?.name === sessionClassFilter;
-      const matchesCategory = sessionCategoryFilter === "all" || session.classes?.category === sessionCategoryFilter;
+      const matchesCategory = sessionCategoryFilter === "all" || (session.classes as any)?.category === sessionCategoryFilter || (session.classes as any)?.category_id === sessionCategoryFilter;
       return matchesInstructor && matchesClass && matchesCategory;
     });
   }, [sessions, sessionInstructorFilter, sessionClassFilter, sessionCategoryFilter]);
@@ -333,30 +561,72 @@ const AdminManageClasses = () => {
 
   // Get unique session categories
   const sessionCategories = useMemo(() => {
-    const unique = Array.from(new Set(sessions.map(s => s.classes?.category).filter(Boolean)));
+    const unique = Array.from(new Set(sessions.map(s => (s.classes as any)?.category || (s.classes as any)?.category_id).filter(Boolean)));
     return unique.sort();
   }, [sessions]);
 
   const handleClassSubmit = async (data: ClassFormData) => {
     try {
+      let imageUrl = data.image_url || "";
+
+      // Upload new image if provided
+      if (classImageFile && editingClass) {
+        setUploadingClassImage(true);
+        imageUrl = await uploadClassImage(classImageFile, editingClass.id);
+      } else if (classImageFile && !editingClass) {
+        // For new classes, we need to create the class first to get an ID
+        // So we'll handle this after creation
+        const tempId = `temp-${Date.now()}`;
+        setUploadingClassImage(true);
+        imageUrl = await uploadClassImage(classImageFile, tempId);
+      }
+
       if (editingClass) {
+        // Delete old image if new one is uploaded
+        if (classImageFile && editingClass.image_url) {
+          await deleteImage(editingClass.image_url, "class-images");
+        }
+
         const { error } = await supabase
           .from("classes")
-          .update(data)
+          .update({
+            ...data,
+            image_url: imageUrl || null,
+          } as any)
           .eq("id", editingClass.id);
 
         if (error) throw error;
         showSuccessToast("Class updated successfully");
       } else {
-        const { error } = await supabase.from("classes").insert([data]);
+        // Create new class
+        const { data: newClass, error } = await supabase
+          .from("classes")
+          .insert([{
+            ...data,
+            image_url: imageUrl || null,
+          } as any])
+          .select()
+          .single();
 
         if (error) throw error;
+
+        // If we uploaded with temp ID, re-upload with real ID
+        if (classImageFile && newClass && (newClass as any).id) {
+          const realImageUrl = await uploadClassImage(classImageFile, (newClass as any).id);
+          await supabase
+            .from("classes")
+            .update({ image_url: realImageUrl })
+            .eq("id", (newClass as any).id);
+        }
+
         showSuccessToast("Class created successfully");
       }
 
       setDialogOpen(false);
       classForm.reset();
       setEditingClass(null);
+      setClassImageFile(null);
+      setClassImagePreview(null);
       await fetchClasses();
       await fetchInstructors();
     } catch (error: any) {
@@ -364,6 +634,8 @@ const AdminManageClasses = () => {
         title: "Error",
         description: error.message,
       });
+    } finally {
+      setUploadingClassImage(false);
     }
   };
 
@@ -395,9 +667,12 @@ const AdminManageClasses = () => {
       duration: classItem.duration,
       capacity: classItem.capacity,
       category: classItem.category || "",
+      category_id: classItem.category_id || null,
       image_url: classItem.image_url || "",
       is_active: classItem.is_active,
     });
+    setClassImagePreview(classItem.image_url || null);
+    setClassImageFile(null);
     setDialogOpen(true);
   };
 
@@ -594,6 +869,8 @@ const AdminManageClasses = () => {
           if (!open) {
             classForm.reset();
             setEditingClass(null);
+            setClassImageFile(null);
+            setClassImagePreview(null);
           }
         }}>
           <DialogTrigger asChild>
@@ -656,17 +933,52 @@ const AdminManageClasses = () => {
                   />
                   <FormField
                     control={classForm.control}
-                    name="category"
+                    name="category_id"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Category</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="e.g., Cardio, Strength" />
-                        </FormControl>
+                        <Select
+                          value={field.value || ""}
+                          onValueChange={(value) => field.onChange(value === "" ? null : value)}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a category (optional)" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="">None</SelectItem>
+                            {classCategories
+                              .filter((cat) => cat.is_active)
+                              .map((category) => (
+                                <SelectItem key={category.id} value={category.id}>
+                                  {category.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormDescription>
+                          Or use the legacy category field below
+                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
+                </div>
+                <FormField
+                  control={classForm.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category (Legacy - Text Field)</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="e.g., Cardio, Strength (optional if using category dropdown above)" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <div className="grid grid-cols-2 gap-4">
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
@@ -708,19 +1020,95 @@ const AdminManageClasses = () => {
                     )}
                   />
                 </div>
-                <FormField
-                  control={classForm.control}
-                  name="image_url"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Image URL</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="https://example.com/image.jpg" />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+                <div className="space-y-2">
+                  <Label>Class Image</Label>
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+
+                          // Validate file type
+                          if (!file.type.startsWith("image/")) {
+                            showErrorToast({
+                              title: "Invalid file type",
+                              description: "Please upload an image file.",
+                            });
+                            return;
+                          }
+
+                          // Validate file size (max 5MB)
+                          if (file.size > 5 * 1024 * 1024) {
+                            showErrorToast({
+                              title: "File too large",
+                              description: "Please upload an image smaller than 5MB.",
+                            });
+                            return;
+                          }
+
+                          setClassImageFile(file);
+
+                          // Create preview
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setClassImagePreview(reader.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                        className="cursor-pointer"
+                      />
+                    </div>
+                    {classImagePreview && (
+                      <div className="relative">
+                        <img
+                          src={classImagePreview}
+                          alt="Preview"
+                          className="w-20 h-20 object-cover rounded-md border"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                          onClick={() => {
+                            setClassImageFile(null);
+                            setClassImagePreview(null);
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  {editingClass && editingClass.image_url && !classImagePreview && (
+                    <div className="relative inline-block">
+                      <img
+                        src={editingClass.image_url}
+                        alt="Current"
+                        className="w-20 h-20 object-cover rounded-md border"
+                      />
+                    </div>
                   )}
-                />
+                  <FormField
+                    control={classForm.control}
+                    name="image_url"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Image URL (Alternative)</FormLabel>
+                        <FormControl>
+                          <Input {...field} placeholder="https://example.com/image.jpg (or upload above)" />
+                        </FormControl>
+                        <FormDescription>
+                          Upload an image file above, or paste an image URL here
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <FormField
                   control={classForm.control}
                   name="is_active"
@@ -734,10 +1122,32 @@ const AdminManageClasses = () => {
                   )}
                 />
                 <DialogFooter>
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setDialogOpen(false);
+                      classForm.reset();
+                      setEditingClass(null);
+                      setClassImageFile(null);
+                      setClassImagePreview(null);
+                    }}
+                    disabled={uploadingClassImage}
+                  >
                     Cancel
                   </Button>
-                  <Button type="submit">{editingClass ? "Update" : "Create"} Class</Button>
+                  <Button type="submit" disabled={uploadingClassImage}>
+                    {uploadingClassImage ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : editingClass ? (
+                      "Update Class"
+                    ) : (
+                      "Create Class"
+                    )}
+                  </Button>
                 </DialogFooter>
               </form>
             </Form>
@@ -751,6 +1161,7 @@ const AdminManageClasses = () => {
           <TabsTrigger value="sessions">Sessions</TabsTrigger>
           <TabsTrigger value="calendar">Calendar</TabsTrigger>
           <TabsTrigger value="instructors">Instructors</TabsTrigger>
+          <TabsTrigger value="categories">Categories</TabsTrigger>
         </TabsList>
 
         {/* Classes Tab */}
@@ -778,7 +1189,7 @@ const AdminManageClasses = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Categories</SelectItem>
-                    {categories.map((cat) => (
+                    {categoryNames.map((cat) => (
                       <SelectItem key={cat} value={cat}>
                         {cat}
                       </SelectItem>
@@ -1167,6 +1578,261 @@ const AdminManageClasses = () => {
                       </CardContent>
                     </Card>
                   ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Categories Tab */}
+        <TabsContent value="categories" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold">Category Management</h2>
+              <p className="text-muted-foreground">Manage class categories with images and descriptions</p>
+            </div>
+            <Dialog
+              open={categoryDialogOpen}
+              onOpenChange={(open) => {
+                setCategoryDialogOpen(open);
+                if (!open) {
+                  categoryForm.reset();
+                  setEditingCategory(null);
+                  setCategoryImageFile(null);
+                  setCategoryImagePreview(null);
+                }
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button
+                  onClick={() => {
+                    categoryForm.reset();
+                    setEditingCategory(null);
+                    setCategoryImageFile(null);
+                    setCategoryImagePreview(null);
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Category
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingCategory ? "Edit Category" : "Add New Category"}</DialogTitle>
+                  <DialogDescription>
+                    {editingCategory ? "Update category details" : "Create a new class category"}
+                  </DialogDescription>
+                </DialogHeader>
+                <Form {...categoryForm}>
+                  <form onSubmit={categoryForm.handleSubmit(handleCategorySubmit)} className="space-y-4">
+                    <FormField
+                      control={categoryForm.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Category Name *</FormLabel>
+                          <FormControl>
+                            <Input {...field} placeholder="e.g., Combat, Cycle, Mind & Body" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={categoryForm.control}
+                      name="description"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description</FormLabel>
+                          <FormControl>
+                            <Textarea {...field} rows={3} placeholder="Describe this category..." />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={categoryForm.control}
+                      name="display_order"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Display Order</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              {...field}
+                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                              min="0"
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Lower numbers appear first in the category filter
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <div className="space-y-2">
+                      <Label>Category Image</Label>
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1">
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleCategoryImageChange}
+                            className="cursor-pointer"
+                          />
+                        </div>
+                        {categoryImagePreview && (
+                          <div className="relative">
+                            <img
+                              src={categoryImagePreview}
+                              alt="Preview"
+                              className="w-20 h-20 object-cover rounded-md border"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                              onClick={() => {
+                                setCategoryImageFile(null);
+                                setCategoryImagePreview(null);
+                              }}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      {editingCategory && editingCategory.image_url && !categoryImagePreview && (
+                        <div className="relative inline-block">
+                          <img
+                            src={editingCategory.image_url}
+                            alt="Current"
+                            className="w-20 h-20 object-cover rounded-md border"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <FormField
+                      control={categoryForm.control}
+                      name="is_active"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                          <FormControl>
+                            <Switch checked={field.value} onCheckedChange={field.onChange} />
+                          </FormControl>
+                          <FormLabel>Active (visible to members)</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setCategoryDialogOpen(false);
+                          categoryForm.reset();
+                          setEditingCategory(null);
+                          setCategoryImageFile(null);
+                          setCategoryImagePreview(null);
+                        }}
+                        disabled={uploadingCategoryImage}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={uploadingCategoryImage}>
+                        {uploadingCategoryImage ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : editingCategory ? (
+                          "Update Category"
+                        ) : (
+                          "Create Category"
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </Form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <Card>
+              <CardHeader>
+              <CardTitle>All Categories ({classCategories.length})</CardTitle>
+              <CardDescription>Manage class categories and their display settings</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {categoriesLoading ? (
+                <LoadingSpinner size="md" text="Loading categories..." />
+              ) : classCategories.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-muted-foreground mb-4">No categories found</p>
+                  <Button onClick={() => setCategoryDialogOpen(true)}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create First Category
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {classCategories.map((category) => {
+                    const classesUsingCategory = classes.filter((c: any) => c.category_id === category.id).length;
+                    return (
+                      <Card key={category.id} className="overflow-hidden">
+                        {category.image_url && (
+                          <div className="h-32 w-full overflow-hidden">
+                            <img
+                              src={category.image_url}
+                              alt={category.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <h3 className="font-semibold text-lg">{category.name}</h3>
+                              {category.description && (
+                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                  {category.description}
+                                </p>
+                              )}
+                            </div>
+                            <Badge variant={category.is_active ? "default" : "secondary"}>
+                              {category.is_active ? "Active" : "Inactive"}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-between text-sm text-muted-foreground mb-3">
+                            <span>Order: {category.display_order}</span>
+                            <span>{classesUsingCategory} class(es)</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-1"
+                              onClick={() => handleEditCategory(category)}
+                            >
+                              <Pencil className="w-4 h-4 mr-2" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDeleteCategory(category.id)}
+                              disabled={classesUsingCategory > 0}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

@@ -33,14 +33,41 @@ export const instructorSchema = z
   .trim();
 
 /**
- * Category validation schema
+ * Category validation schema (legacy text field)
  */
-export const categorySchema = z
+export const categoryTextSchema = z
   .string()
   .max(50, "Category must be less than 50 characters")
   .trim()
   .optional()
   .or(z.literal(""));
+
+/**
+ * Category ID validation schema (for new category system)
+ */
+export const categoryIdSchema = z
+  .string()
+  .uuid("Invalid category ID")
+  .optional()
+  .nullable();
+
+/**
+ * Category name validation schema
+ */
+export const categoryNameSchema = z
+  .string()
+  .min(1, "Category name is required")
+  .max(100, "Category name must be less than 100 characters")
+  .trim();
+
+/**
+ * Display order validation schema
+ */
+export const displayOrderSchema = z
+  .number()
+  .int("Display order must be a whole number")
+  .min(0, "Display order must be 0 or greater")
+  .default(0);
 
 /**
  * Duration validation schema (in minutes)
@@ -79,7 +106,8 @@ export const classSchema = z.object({
   name: classNameSchema,
   description: descriptionSchema,
   instructor: instructorSchema,
-  category: categorySchema,
+  category: categoryTextSchema, // Legacy text field (kept for backward compatibility)
+  category_id: categoryIdSchema, // New category reference
   duration: durationSchema,
   capacity: capacitySchema,
   schedule: scheduleSchema,
@@ -91,6 +119,24 @@ export const classSchema = z.object({
     .or(z.literal("")),
   is_active: z.boolean().optional().default(true),
 });
+
+/**
+ * Category creation/update validation schema
+ */
+export const categorySchema = z.object({
+  name: categoryNameSchema,
+  description: descriptionSchema,
+  image_url: z
+    .string()
+    .url("Image URL must be a valid URL")
+    .max(500, "Image URL must be less than 500 characters")
+    .optional()
+    .or(z.literal("")),
+  is_active: z.boolean().optional().default(true),
+  display_order: displayOrderSchema,
+});
+
+export type CategoryFormData = z.infer<typeof categorySchema>;
 
 export type ClassFormData = z.infer<typeof classSchema>;
 

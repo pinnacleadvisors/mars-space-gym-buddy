@@ -68,7 +68,8 @@ mars-space-gym-buddy/
 │   │       ├── toastHelpers.ts    # Toast notification helpers
 │   │       ├── qrCode.ts          # QR code generation utilities
 │   │       ├── rewardClaim.ts     # Reward claim utility functions
-│   │       └── pathUtils.ts       # Path utilities for base path handling (GitHub Pages)
+│   │       ├── pathUtils.ts       # Path utilities for base path handling (GitHub Pages)
+│   │       └── imageUpload.ts    # Image upload utilities for classes and categories (Supabase Storage)
 │   ├── lib/
 │   │   └── validations/          # Zod validation schemas
 │   │       ├── auth.ts            # Authentication form schemas
@@ -1092,9 +1093,19 @@ The Landing page (`src/pages/Landing.tsx`) includes:
 
 ### Classes Page Features
 The Classes page (`src/pages/Classes.tsx`) includes:
+- **Hero Section**: Large headline "Award-winning classes led by the best instructors" with tagline
+- **Category Filter Buttons**: Horizontal pill-shaped buttons at top (All, Combat, Cycle, Mind & Body, etc.) matching Third Space design
 - **Dual View Modes**: 
-  - Grid view: Card-based layout showing all available sessions
+  - Grid view: Card-based layout showing all available sessions (default view)
   - Calendar view: Monthly calendar grid with day view for detailed scheduling
+- **Enhanced Class Cards**: 
+  - Large category/class image at top with hover effects
+  - Class name as prominent heading
+  - Description text (truncated with line-clamp)
+  - Instructor name
+  - Time, duration, and availability information
+  - "Book Class" button with large size
+  - Visual status badges (Full, Few Spots Left, Booked)
 - **Calendar View Features**:
   - Monthly 30-day calendar grid showing available classes
   - Pill-shaped session labels in date cells showing class name
@@ -1109,9 +1120,13 @@ The Classes page (`src/pages/Classes.tsx`) includes:
 - **Advanced Filtering**: 
   - Search by class name, instructor, or class template name
   - Filter by class name (from class templates)
-  - Filter by fitness category
+  - Filter by fitness category (using category buttons or dropdown)
   - Filter by instructor
   - Filter by date (today, this week, upcoming, my bookings)
+- **Category Integration**: 
+  - Fetches categories from `class_categories` table
+  - Displays category images when filtering
+  - Uses category_id for filtering (with fallback to legacy category text)
 - **Visual indicators**: Badges show "Full", "Few Spots Left", or "Booked" status
 - **Error handling**: Toast notifications for booking success/failure
 - **Date formatting**: Uses `date-fns` for readable date/time display
@@ -1405,9 +1420,21 @@ The AdminManageDeals page (`src/pages/AdminManageDeals.tsx`) includes:
 The AdminManageClasses page (`src/pages/AdminManageClasses.tsx`) includes:
 - **Class Creation/Editing**:
   - Create and edit class templates with comprehensive form validation
-  - Fields: name, description, instructor, category, duration, capacity, image URL, active status
+  - Fields: name, description, instructor, category (dropdown), category_id, duration, capacity, image upload/URL, active status
+  - **Category Dropdown**: Select from active categories in `class_categories` table
+  - **Image Upload**: Upload class images to Supabase Storage (`class-images` bucket) with preview
+  - **Legacy Support**: Maintains backward compatibility with category text field
   - Form validation using Zod schemas with helpful error messages
   - Delete classes (with confirmation)
+- **Category Management Tab**:
+  - **CRUD Operations**: Create, edit, and delete categories
+  - **Category Form**: Name, description, image upload, display order, active toggle
+  - **Image Upload**: Upload category images to Supabase Storage (`category-images` bucket) with preview
+  - **Category List**: Grid view showing category cards with images, descriptions, and statistics
+  - **Usage Tracking**: Shows number of classes using each category
+  - **Deletion Protection**: Prevents deletion of categories in use by classes
+  - **Display Order**: Manage category display order for UI sorting
+  - **Active/Inactive Toggle**: Control category visibility
 - **Improved Class Session Creation UI**:
   - Enhanced dialog with better layout and organization
   - Form validation using react-hook-form and Zod
@@ -1453,9 +1480,9 @@ The AdminManageClasses page (`src/pages/AdminManageClasses.tsx`) includes:
   - Filter by category
   - Filter by instructor
   - Real-time filtering as you type
-- **Tabbed Interface**: Organized into Classes, Sessions, Calendar, and Instructors tabs
+- **Tabbed Interface**: Organized into Classes, Sessions, Calendar, Instructors, and Categories tabs
 - **Database relationship**: Sessions linked to classes via `class_id` foreign key (nullable for standalone sessions)
-- **Real-time Data**: Fetches latest classes, sessions, bookings, and instructor data
+- **Real-time Data**: Fetches latest classes, sessions, bookings, instructor, and category data
 - **Loading States**: Loading spinner during data fetch
 - **Error Handling**: Toast notifications for all operations
 - **Form Validation**: Comprehensive validation with helpful error messages
@@ -2183,6 +2210,30 @@ if (qrData && qrData.action === 'reward') {
 **Migration File:**
 - `supabase/migrations/ADD_REWARD_CLAIMS.sql`: Creates `reward_claims` table and `claim_reward()` function
 - Run this migration in Supabase Dashboard SQL Editor to enable reward claims
+
+### Image Upload Utilities
+The application implements image upload functionality for classes and categories:
+
+**Image Upload Utility (`src/lib/utils/imageUpload.ts`):**
+- `uploadClassImage(file: File, classId: string): Promise<string>` - Uploads class images to `class-images` bucket
+- `uploadCategoryImage(file: File, categoryId: string): Promise<string>` - Uploads category images to `category-images` bucket
+- `deleteImage(url: string, bucket: string): Promise<void>` - Deletes images from Supabase Storage
+- `extractFilePathFromUrl(url: string, bucket: string): string | null` - Extracts file path from public URL
+
+**Storage Buckets:**
+- `class-images`: Stores class images organized by class ID
+- `category-images`: Stores category images organized by category ID
+- **RLS Policies**: Public read access, admin write access
+- **File Validation**: 
+  - Image files only (validates MIME type)
+  - Maximum file size: 5MB
+  - Automatic file naming: `{id}-{timestamp}.{ext}`
+
+**Usage:**
+- Class images: Uploaded when creating/editing classes in AdminManageClasses
+- Category images: Uploaded when creating/editing categories in AdminManageClasses
+- Images are automatically deleted when replaced or when entity is deleted
+- Supports both file upload and URL input (for external images)
 
 ## 📚 Additional Resources
 
