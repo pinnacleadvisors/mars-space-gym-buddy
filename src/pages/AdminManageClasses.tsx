@@ -938,8 +938,8 @@ const AdminManageClasses = () => {
                       <FormItem>
                         <FormLabel>Category</FormLabel>
                         <Select
-                          value={field.value || ""}
-                          onValueChange={(value) => field.onChange(value === "" ? null : value)}
+                          value={field.value || "none"}
+                          onValueChange={(value) => field.onChange(value === "none" ? null : value)}
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -947,7 +947,7 @@ const AdminManageClasses = () => {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">None</SelectItem>
+                            <SelectItem value="none">None</SelectItem>
                             {classCategories
                               .filter((cat) => cat.is_active)
                               .map((category) => (
