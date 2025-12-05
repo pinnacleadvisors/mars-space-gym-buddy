@@ -381,17 +381,12 @@ const AdminManageClasses = () => {
     try {
       let imageUrl = data.image_url || "";
 
-      // Upload new image if provided
+      // Upload new image if provided (only for editing existing categories)
       if (categoryImageFile && editingCategory) {
         setUploadingCategoryImage(true);
         imageUrl = await uploadCategoryImage(categoryImageFile, editingCategory.id);
-      } else if (categoryImageFile && !editingCategory) {
-        // For new categories, we need to create the category first to get an ID
-        // So we'll handle this after creation
-        const tempId = `temp-${Date.now()}`;
-        setUploadingCategoryImage(true);
-        imageUrl = await uploadCategoryImage(categoryImageFile, tempId);
       }
+      // For new categories, we'll upload the image after creation with the real ID
 
       if (editingCategory) {
         // Delete old image if new one is uploaded
@@ -410,25 +405,32 @@ const AdminManageClasses = () => {
         if (error) throw error;
         showSuccessToast("Category updated successfully");
       } else {
-        // Create new category
+        // Create new category first (without image if we have a file to upload)
         const { data: newCategory, error } = await supabase
           .from("class_categories" as any)
           .insert([{
             ...data,
-            image_url: imageUrl || null,
+            image_url: categoryImageFile ? null : (imageUrl || null), // Only set image_url if no file to upload
           }])
           .select()
           .single();
 
         if (error) throw error;
 
-        // If we uploaded with temp ID, re-upload with real ID
+        // If we have an image file, upload it with the real category ID and update
         if (categoryImageFile && newCategory && (newCategory as any).id) {
-          const realImageUrl = await uploadCategoryImage(categoryImageFile, (newCategory as any).id);
-          await supabase
-            .from("class_categories" as any)
-            .update({ image_url: realImageUrl })
-            .eq("id", (newCategory as any).id);
+          setUploadingCategoryImage(true);
+          try {
+            const realImageUrl = await uploadCategoryImage(categoryImageFile, (newCategory as any).id);
+            const { error: updateError } = await supabase
+              .from("class_categories" as any)
+              .update({ image_url: realImageUrl })
+              .eq("id", (newCategory as any).id);
+            
+            if (updateError) throw updateError;
+          } finally {
+            setUploadingCategoryImage(false);
+          }
         }
 
         showSuccessToast("Category created successfully");

@@ -122,7 +122,8 @@ mars-space-gym-buddy/
 │       ├── COMPLETE_SCHEMA_SETUP.sql # Complete database schema setup from scratch
 │       ├── ADD_REWARD_CLAIMS.sql  # Adds reward_claims table and claim_reward() function
 │       ├── ADD_COUPON_CODES.sql   # Adds coupon_codes and coupon_usage tables with validation functions
-│       └── ADD_PAYMENT_METHOD_TO_USER_MEMBERSHIPS.sql  # Adds payment_method and stripe_subscription_id columns
+│       ├── ADD_PAYMENT_METHOD_TO_USER_MEMBERSHIPS.sql  # Adds payment_method and stripe_subscription_id columns
+│       └── ADD_CLASS_CATEGORIES.sql  # Adds class_categories table and category_id column to classes table
 ├── scripts/                       # Utility scripts
 │   ├── sync-database-types.sh    # Script to sync database types from GitHub
 │   └── watch-database-types.sh   # Watch script for auto-pulling type updates
@@ -187,6 +188,7 @@ mars-space-gym-buddy/
   - `ADD_REWARD_CLAIMS.sql`: Adds reward_claims table and claim_reward() function
   - `ADD_COUPON_CODES.sql`: Adds coupon_codes and coupon_usage tables with validation functions
   - `ADD_PAYMENT_METHOD_TO_USER_MEMBERSHIPS.sql`: Adds payment_method and stripe_subscription_id columns to user_memberships table
+  - `ADD_CLASS_CATEGORIES.sql`: Adds class_categories table and category_id column to classes table
 - **Reference**: Always check `src/types/database.ts` for the current database schema state
 
 **📖 Reading the Schema**:
@@ -244,12 +246,36 @@ mars-space-gym-buddy/
   - `schedule` (text)
   - `duration` (integer, minutes)
   - `capacity` (integer, default 20)
-  - `category` (text)
+  - `category` (text) - Legacy category field (text)
+  - `category_id` (uuid, FK → class_categories, nullable) - References class_categories table
   - `image_url` (text)
   - `is_active` (boolean, default true)
   - `created_at` (timestamptz)
   - `updated_at` (timestamptz)
 - **RLS**: Anyone can view active classes, admins can manage all
+- **Migration**: `category_id` column added in `supabase/migrations/ADD_CLASS_CATEGORIES.sql`
+
+#### `class_categories`
+- **Purpose**: Class category definitions with images and descriptions
+- **Columns**:
+  - `id` (uuid, PK)
+  - `name` (text, unique)
+  - `description` (text, nullable)
+  - `image_url` (text, nullable)
+  - `is_active` (boolean, default true)
+  - `display_order` (integer, default 0)
+  - `created_at` (timestamptz)
+  - `updated_at` (timestamptz)
+- **RLS**: 
+  - Anyone can view active categories (`is_active = true`)
+  - Admins can view all categories (including inactive) (`has_role(auth.uid(), 'admin'::app_role)`)
+  - Admins can insert/update/delete categories (`has_role(auth.uid(), 'admin'::app_role)`)
+  - All admin policies use `TO authenticated` for proper RLS evaluation
+- **Migration**: Created in `supabase/migrations/ADD_CLASS_CATEGORIES.sql`
+- **Indexes**: 
+  - `idx_class_categories_name` on `name`
+  - `idx_class_categories_is_active` on `is_active`
+  - `idx_class_categories_display_order` on `display_order`
 
 #### `class_sessions`
 - **Purpose**: Scheduled class instances
