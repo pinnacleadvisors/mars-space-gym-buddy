@@ -231,8 +231,8 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background p-6">
-      <div className="container mx-auto max-w-7xl">
+    <div className="min-h-screen bg-background p-6 overflow-x-hidden w-full max-w-full">
+      <div className="container mx-auto max-w-7xl w-full">
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold">Member Dashboard</h1>
           <Button onClick={() => fetchDashboardData()} variant="outline" size="sm">
@@ -298,101 +298,104 @@ const Dashboard = () => {
           />
         </div>
 
-        {/* Rewards Widget */}
-        <Card className="mb-8 cursor-pointer hover:bg-accent/5 transition-colors" onClick={() => navigate("/rewards")}>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-primary" />
-                Rewards Progress
-              </CardTitle>
-              <ArrowRight className="w-4 h-4 text-muted-foreground" />
-            </div>
-            <CardDescription>Click to view full rewards page</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Hours in Gym Progress */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">Hours in Gym</span>
-                </div>
-                <span className="text-sm font-semibold">
-                  {totalHours.toFixed(1)}/{HOURS_TARGET}
-                </span>
-              </div>
-              <Progress value={Math.min((totalHours / HOURS_TARGET) * 100, 100)} className="h-2" />
-            </div>
-
-            {/* Classes Progress */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Dumbbell className="w-4 h-4 text-secondary" />
-                  <span className="text-sm font-medium">Classes</span>
-                </div>
-                <span className="text-sm font-semibold">
-                  {totalClasses}/{CLASSES_TARGET}
-                </span>
-              </div>
-              <Progress value={Math.min((totalClasses / CLASSES_TARGET) * 100, 100)} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Membership Status Widget */}
-        {membership && (
-          <Card className="mb-8">
+        {/* Rewards Progress and Membership Status - Side by side on laptop */}
+        <div className="grid md:grid-cols-2 gap-6 mb-8">
+          {/* Rewards Widget */}
+          <Card className="cursor-pointer hover:bg-accent/5 transition-colors max-w-md md:max-w-full" onClick={() => navigate("/rewards")}>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5" />
-                Membership Status
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-primary" />
+                  Rewards Progress
+                </CardTitle>
+                <ArrowRight className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <CardDescription>Click to view full rewards page</CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="space-y-2">
+            <CardContent className="space-y-4">
+              {/* Hours in Gym Progress */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium">{membership.memberships?.name || "Membership"}</span>
-                    <Badge
-                      variant={
-                        membershipStatus === "active"
-                          ? "default"
-                          : membershipStatus === "expired"
-                          ? "destructive"
-                          : "secondary"
-                      }
-                    >
-                      {membershipStatus === "active" ? (
-                        <><CheckCircle2 className="w-3 h-3 mr-1" /> Active</>
-                      ) : membershipStatus === "expired" ? (
-                        <><XCircle className="w-3 h-3 mr-1" /> Expired</>
-                      ) : (
-                        <><AlertCircle className="w-3 h-3 mr-1" /> Inactive</>
-                      )}
-                    </Badge>
+                    <Clock className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-medium">Hours in Gym</span>
                   </div>
-                  {membershipStatus === "active" && (
-                    <p className="text-sm text-muted-foreground">
-                      Expires on {format(new Date(membership.end_date), "MMM d, yyyy")} ({membershipDaysRemaining} days remaining)
-                    </p>
-                  )}
-                  {membershipStatus === "expired" && (
-                    <p className="text-sm text-muted-foreground">
-                      Expired on {format(new Date(membership.end_date), "MMM d, yyyy")}
-                    </p>
-                  )}
+                  <span className="text-sm font-semibold">
+                    {totalHours.toFixed(1)}/{HOURS_TARGET}
+                  </span>
                 </div>
-                {membershipStatus !== "active" && (
-                  <Button onClick={() => navigate("/managememberships")} variant="outline">
-                    Start Membership
-                  </Button>
-                )}
+                <Progress value={Math.min((totalHours / HOURS_TARGET) * 100, 100)} className="h-2" />
+              </div>
+
+              {/* Classes Progress */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Dumbbell className="w-4 h-4 text-secondary" />
+                    <span className="text-sm font-medium">Classes</span>
+                  </div>
+                  <span className="text-sm font-semibold">
+                    {totalClasses}/{CLASSES_TARGET}
+                  </span>
+                </div>
+                <Progress value={Math.min((totalClasses / CLASSES_TARGET) * 100, 100)} className="h-2" />
               </div>
             </CardContent>
           </Card>
-        )}
+
+          {/* Membership Status Widget */}
+          {membership && (
+            <Card className="max-w-md md:max-w-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="w-5 h-5" />
+                  Membership Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{membership.memberships?.name || "Membership"}</span>
+                      <Badge
+                        variant={
+                          membershipStatus === "active"
+                            ? "default"
+                            : membershipStatus === "expired"
+                            ? "destructive"
+                            : "secondary"
+                        }
+                      >
+                        {membershipStatus === "active" ? (
+                          <><CheckCircle2 className="w-3 h-3 mr-1" /> Active</>
+                        ) : membershipStatus === "expired" ? (
+                          <><XCircle className="w-3 h-3 mr-1" /> Expired</>
+                        ) : (
+                          <><AlertCircle className="w-3 h-3 mr-1" /> Inactive</>
+                        )}
+                      </Badge>
+                    </div>
+                    {membershipStatus === "active" && (
+                      <p className="text-sm text-muted-foreground">
+                        Expires on {format(new Date(membership.end_date), "MMM d, yyyy")} ({membershipDaysRemaining} days remaining)
+                      </p>
+                    )}
+                    {membershipStatus === "expired" && (
+                      <p className="text-sm text-muted-foreground">
+                        Expired on {format(new Date(membership.end_date), "MMM d, yyyy")}
+                      </p>
+                    )}
+                  </div>
+                  {membershipStatus !== "active" && (
+                    <Button onClick={() => navigate("/managememberships")} variant="outline">
+                      Start Membership
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
 
         {/* Upcoming Class Reminders */}
         {upcomingClasses.length > 0 && (

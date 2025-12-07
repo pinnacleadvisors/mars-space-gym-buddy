@@ -795,7 +795,7 @@ export default function ManageMemberships() {
   const isCancelled = userMembership?.status === "cancelled";
 
   return (
-    <div className="container mx-auto p-6 max-w-4xl">
+    <div className="container mx-auto p-6 max-w-4xl overflow-x-hidden w-full max-w-full">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Manage Membership</h1>
         {/* Change Plan Toggle - Only show when user has a membership */}
@@ -877,8 +877,50 @@ export default function ManageMemberships() {
             {showChangePlan ? "Change Your Plan" : "Available Membership Plans"}
           </h2>
           
-          {/* Coupon Code Input */}
-          <Card>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {availableMemberships.map((plan) => {
+              const isCurrentPlan = userMembership?.membership_id === plan.id;
+              return (
+                <Card 
+                  key={plan.id} 
+                  className={`flex flex-col ${isCurrentPlan ? "ring-2 ring-primary" : ""}`}
+                >
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle>{plan.name}</CardTitle>
+                        <CardDescription>
+                          {plan.price ? `£${plan.price}` : "Free"} {plan.price ? "per month" : ""} • {plan.access_level || "Standard"}
+                        </CardDescription>
+                      </div>
+                      {isCurrentPlan && (
+                        <Badge variant="default">Current</Badge>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex-1 flex flex-col justify-between space-y-4">
+                    <div>
+                      <p className="text-muted-foreground text-sm">
+                        Duration: {plan.duration_days} days
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={() => handleRegister(plan.id)} 
+                      disabled={actionLoading || isCurrentPlan}
+                      className="w-full"
+                      variant={isCurrentPlan ? "secondary" : "default"}
+                    >
+                      {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {isCurrentPlan ? "Current Plan" : showChangePlan ? "Switch to This Plan" : "Start Membership"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Coupon Code Input - Moved to bottom, left-aligned, 1/3 width on laptop */}
+          <Card className="w-full md:w-1/3 text-left">
             <CardHeader>
               <CardTitle className="text-lg">Have a Coupon Code?</CardTitle>
               <CardDescription>
@@ -923,48 +965,6 @@ export default function ManageMemberships() {
               </div>
             </CardContent>
           </Card>
-
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {availableMemberships.map((plan) => {
-              const isCurrentPlan = userMembership?.membership_id === plan.id;
-              return (
-                <Card 
-                  key={plan.id} 
-                  className={`flex flex-col ${isCurrentPlan ? "ring-2 ring-primary" : ""}`}
-                >
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle>{plan.name}</CardTitle>
-                        <CardDescription>
-                          {plan.price ? `£${plan.price}` : "Free"} {plan.price ? "per month" : ""} • {plan.access_level || "Standard"}
-                        </CardDescription>
-                      </div>
-                      {isCurrentPlan && (
-                        <Badge variant="default">Current</Badge>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="flex-1 flex flex-col justify-between space-y-4">
-                    <div>
-                      <p className="text-muted-foreground text-sm">
-                        Duration: {plan.duration_days} days
-                      </p>
-                    </div>
-                    <Button 
-                      onClick={() => handleRegister(plan.id)} 
-                      disabled={actionLoading || isCurrentPlan}
-                      className="w-full"
-                      variant={isCurrentPlan ? "secondary" : "default"}
-                    >
-                      {actionLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      {isCurrentPlan ? "Current Plan" : showChangePlan ? "Switch to This Plan" : "Start Membership"}
-                    </Button>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
         </div>
       )}
 

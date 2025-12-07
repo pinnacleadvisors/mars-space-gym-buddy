@@ -5,7 +5,7 @@ const Landing = () => {
   const navigate = useNavigate();
 
   return (
-    <div className="relative min-h-screen overflow-hidden">
+    <div className="relative min-h-screen overflow-hidden overflow-x-hidden w-full max-w-full">
       {/* Full-screen hero background image */}
       <div 
         className="fixed inset-0 bg-cover bg-center bg-no-repeat"
@@ -39,8 +39,8 @@ const Landing = () => {
           </p>
         </div>
           
-        {/* Bottom buttons - horizontally aligned pill-shaped */}
-        <div className="flex-shrink-0 w-full max-w-md mx-auto space-x-4 mb-8 md:mb-12 px-4">
+        {/* Bottom buttons - horizontally aligned pill-shaped, centered */}
+        <div className="flex-shrink-0 w-full max-w-md mx-auto flex items-center justify-center space-x-4 mb-8 md:mb-12 px-4">
             <Button 
             onClick={() => navigate("/login")}
             className="flex-1 h-12 md:h-14 rounded-full bg-white text-black font-semibold text-base md:text-lg hover:bg-white/90 transition-all shadow-lg hover:shadow-xl"

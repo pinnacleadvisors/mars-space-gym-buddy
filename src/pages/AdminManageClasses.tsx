@@ -147,6 +147,7 @@ const AdminManageClasses = () => {
   const [sessionEditDialogOpen, setSessionEditDialogOpen] = useState(false);
   const [capacityDialogOpen, setCapacityDialogOpen] = useState(false);
   const [instructorDialogOpen, setInstructorDialogOpen] = useState(false);
+  const [classSelectDialogOpen, setClassSelectDialogOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const [editingSession, setEditingSession] = useState<ClassSession | null>(null);
   const [selectedClassForSession, setSelectedClassForSession] = useState<Class | null>(null);
@@ -696,6 +697,32 @@ const AdminManageClasses = () => {
       recurringCount: 4,
     });
     setSessionDialogOpen(true);
+  };
+
+  const handleAddSessionClick = () => {
+    if (classes.length === 0) {
+      showErrorToast({
+        title: "No Classes Available",
+        description: "Please create a class first before adding sessions.",
+      });
+      return;
+    }
+    
+    if (classes.length === 1) {
+      // If only one class, directly open session creation dialog
+      handleCreateSession(classes[0]);
+    } else {
+      // If multiple classes, show a dialog to select one
+      setClassSelectDialogOpen(true);
+    }
+  };
+
+  const handleClassSelectForSession = (classId: string) => {
+    const selectedClass = classes.find(c => c.id === classId);
+    if (selectedClass) {
+      setClassSelectDialogOpen(false);
+      handleCreateSession(selectedClass);
+    }
   };
 
   const handleSessionSubmit = async (data: SessionFormData) => {
@@ -1361,8 +1388,16 @@ const AdminManageClasses = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Class Sessions ({filteredSessions.length})</CardTitle>
-              <CardDescription>View and manage class session capacity</CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Class Sessions ({filteredSessions.length})</CardTitle>
+                  <CardDescription>View and manage class session capacity</CardDescription>
+                </div>
+                <Button onClick={handleAddSessionClick}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Session
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               {sessionsLoading ? (
@@ -2258,6 +2293,60 @@ const AdminManageClasses = () => {
               </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Class Selection Dialog for Add Session */}
+      <Dialog open={classSelectDialogOpen} onOpenChange={setClassSelectDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Select a Class</DialogTitle>
+            <DialogDescription>
+              Choose which class you want to create a session for
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            {classes.filter(c => c.is_active).length > 0 ? (
+              classes
+                .filter(c => c.is_active)
+                .map((classItem) => (
+                  <Button
+                    key={classItem.id}
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => handleClassSelectForSession(classItem.id)}
+                  >
+                    <div className="flex flex-col items-start">
+                      <span className="font-medium">{classItem.name}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {classItem.instructor} • {classItem.duration} min
+                      </span>
+                    </div>
+                  </Button>
+                ))
+            ) : (
+              classes.map((classItem) => (
+                <Button
+                  key={classItem.id}
+                  variant="outline"
+                  className="w-full justify-start"
+                  onClick={() => handleClassSelectForSession(classItem.id)}
+                >
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium">{classItem.name}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {classItem.instructor} • {classItem.duration} min
+                    </span>
+                  </div>
+                </Button>
+              ))
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClassSelectDialogOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
