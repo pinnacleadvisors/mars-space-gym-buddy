@@ -127,6 +127,8 @@ mars-space-gym-buddy/
 ├── scripts/                       # Utility scripts
 │   ├── sync-database-types.sh    # Script to sync database types from GitHub
 │   └── watch-database-types.sh   # Watch script for auto-pulling type updates
+├── email-templates/               # Email templates for Supabase
+│   └── confirm-email.html        # Email confirmation template (matches app UI design)
 ├── public/                        # Static public assets
 ├── .github/
 │   └── workflows/
@@ -798,6 +800,7 @@ Defined in `src/index.css`:
    - **RLS Policies**: Users can insert their own profile and 'member' role as fallback (defined in Supabase Dashboard)
    - **Email Verification**: 
      - Verification email sent with a link (via `emailRedirectTo` option)
+     - Uses custom email template (`email-templates/confirm-email.html`) that matches app UI design
      - After signup, user is redirected to `/verify-email` page (not dashboard)
      - User must click the verification link in the email before accessing protected routes
      - **Future Implementation**: OTP code verification can be added in the future if needed (see `Register.tsx` for TODO comment)
@@ -818,7 +821,8 @@ Defined in `src/index.css`:
    - See `Login.tsx` and `Register.tsx` for TODO comments with Apple OAuth code
 4. **Email Verification Flow**:
    - After email/password signup, user is automatically redirected to `/verify-email` page
-   - User receives verification email with link
+   - User receives verification email with link (uses custom template from `email-templates/confirm-email.html`)
+   - Email template matches app's UI design with Earth Space branding
    - User must click the link in the email to verify their account
    - Clicking the verification link verifies email and redirects to dashboard
    - If user tries to access protected routes without verification, `ProtectedRoute` shows `EmailVerificationRequired` page
@@ -874,6 +878,28 @@ To enable Google Sign In, configure the following in Supabase Dashboard:
    - `prompt: 'consent'` - Always shows consent screen (useful for testing)
 
 **Note**: Apple Sign In is saved for future implementation. See commented code in `Login.tsx` and `Register.tsx`.
+
+### Supabase Email Templates
+The application uses custom email templates that match the app's UI design and branding:
+
+**Email Confirmation Template** (`email-templates/confirm-email.html`):
+- **Location**: `email-templates/confirm-email.html`
+- **Branding**: Uses "Earth Space" branding to match the landing page
+- **Design**: 
+  - Dark theme matching app's color scheme (deep warm black background #0f0f12, card background #18181b)
+  - Warm beige/cream accent color (#e8e0d4) matching app's primary color
+  - Professional card-based layout with rounded corners and shadows
+  - Responsive design for mobile and desktop email clients
+- **Features**:
+  - Prominent "Confirm Your Email" call-to-action button with gradient styling
+  - Alternative text link for email clients that don't support buttons
+  - Security note about link expiration (24 hours)
+  - Footer with copyright and branding
+- **Usage**: 
+  - Copy the HTML content from `email-templates/confirm-email.html`
+  - Paste into Supabase Dashboard → Authentication → Email Templates → "Confirm signup" template
+  - The `{{ .ConfirmationURL }}` variable is automatically replaced by Supabase
+- **Email Client Compatibility**: Uses inline CSS and table-based layouts for maximum email client support
 
 ### Membership Flow
 1. User clicks "Start Membership" or "Renew Membership" → `create-checkout` function

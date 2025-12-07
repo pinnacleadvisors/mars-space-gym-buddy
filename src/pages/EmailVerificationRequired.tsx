@@ -3,16 +3,27 @@ import { Button } from "@/components/ui/button";
 import { Mail, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { getFullRedirectUrl } from "@/lib/utils/pathUtils";
 
 const EmailVerificationRequired = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [isResending, setIsResending] = useState(false);
+
+  // Monitor email verification status and redirect when verified
+  useEffect(() => {
+    // Wait for auth to finish loading
+    if (loading) return;
+
+    // If user is verified, redirect to dashboard
+    if (user?.email_verified) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user?.email_verified, loading, navigate]);
 
   const handleResendVerification = async () => {
     if (!user?.email) return;
@@ -53,9 +64,9 @@ const EmailVerificationRequired = () => {
               <Mail className="w-8 h-8 text-accent-foreground" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Email Verification Required</CardTitle>
+          <CardTitle className="text-2xl font-bold">Waiting for Verification</CardTitle>
           <CardDescription>
-            Please verify your email address to continue
+            Please check your email and click the verification link to continue
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -65,7 +76,10 @@ const EmailVerificationRequired = () => {
             </p>
             <p className="font-medium">{user?.email}</p>
             <p className="text-sm text-muted-foreground">
-              Click the link in the email to verify your account.
+              Click the verification link in your email to access the dashboard.
+            </p>
+            <p className="text-xs text-muted-foreground mt-2">
+              This page will automatically redirect once your email is verified.
             </p>
           </div>
 
