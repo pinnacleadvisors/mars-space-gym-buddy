@@ -133,6 +133,20 @@ const AuthCallback = () => {
 
           if (setSessionError) {
             console.error('Session set error:', setSessionError);
+            
+            // Check if this is an invalid/expired verification link (for signup type)
+            const errorMessage = setSessionError.message?.toLowerCase() || '';
+            const isInvalidLink = errorMessage.includes('invalid') || 
+                                 errorMessage.includes('expired') ||
+                                 errorMessage.includes('token');
+            
+            if (type === 'signup' && isInvalidLink) {
+              // Redirect to verify-email page with error state
+              console.log('AuthCallback: Invalid/expired verification link, redirecting to verify-email');
+              navigate('/verify-email?error=invalid_link', { replace: true });
+              return;
+            }
+            
             setError(setSessionError.message);
             return;
           }
@@ -154,6 +168,20 @@ const AuthCallback = () => {
             } else {
               navigate('/dashboard', { replace: true });
             }
+            return;
+          }
+        }
+
+        // Check if there's an error in the URL hash (e.g., error_description)
+        const errorDescription = hashParams.get('error_description');
+        const errorCode = hashParams.get('error');
+        
+        // If we have an error and it's related to signup verification, redirect to verify-email
+        if ((errorDescription || errorCode) && type === 'signup') {
+          const errorMsg = (errorDescription || errorCode || '').toLowerCase();
+          if (errorMsg.includes('invalid') || errorMsg.includes('expired') || errorMsg.includes('token')) {
+            console.log('AuthCallback: Invalid/expired verification link in URL, redirecting to verify-email');
+            navigate('/verify-email?error=invalid_link', { replace: true });
             return;
           }
         }

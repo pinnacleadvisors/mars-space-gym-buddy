@@ -35,6 +35,16 @@ export const ProtectedRoute = ({
     );
   }
 
+  // Special case for /verify-email route: allow access if signup data exists in sessionStorage
+  // This handles the case where user just signed up but doesn't have an active session yet
+  if (location.pathname === '/verify-email') {
+    const pendingSignup = sessionStorage.getItem('pendingSignup');
+    if (!user && pendingSignup) {
+      // Allow access to verify-email page with pending signup data
+      return <>{children}</>;
+    }
+  }
+
   // Redirect to login if not authenticated
   // Save the attempted location to redirect back after login
   if (!user) {

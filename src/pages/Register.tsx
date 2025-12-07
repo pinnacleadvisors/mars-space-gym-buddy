@@ -64,6 +64,13 @@ const Register = () => {
         // Ensure profile and role are created (fallback if trigger fails)
         await ensureProfileAndRole(signUpData.user.id, sanitizedFullName);
         
+        // Store signup data in sessionStorage for the verify-email page
+        // This allows access to the verification page even without an active session
+        sessionStorage.setItem('pendingSignup', JSON.stringify({
+          email: sanitizedEmail,
+          userId: signUpData.user.id,
+        }));
+        
         // Wait a bit for auth state to update
         await new Promise(resolve => setTimeout(resolve, 500));
       }
