@@ -20,7 +20,8 @@ import {
   XCircle,
   BarChart3,
   Users,
-  Calendar
+  Calendar,
+  Award
 } from "lucide-react";
 import {
   Table,
@@ -124,6 +125,14 @@ interface CouponWithUsage extends Coupon {
   usage_count: number;
 }
 
+interface PopularCoupon {
+  coupon_id: string;
+  code: string;
+  type: "percentage" | "money_off";
+  value: number;
+  usage_count: number;
+}
+
 const AdminManageDeals = () => {
   const [coupons, setCoupons] = useState<CouponWithUsage[]>([]);
   const [couponUsage, setCouponUsage] = useState<CouponUsage[]>([]);
@@ -135,6 +144,7 @@ const AdminManageDeals = () => {
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
   const [stats, setStats] = useState<CouponStats | null>(null);
   const [selectedCouponId, setSelectedCouponId] = useState<string | null>(null);
+  const [popularCoupons, setPopularCoupons] = useState<PopularCoupon[]>([]);
   const { toast } = useToast();
 
   const form = useForm<CouponFormData>({
@@ -154,6 +164,7 @@ const AdminManageDeals = () => {
   useEffect(() => {
     fetchCoupons();
     fetchStatistics();
+    fetchPopularCoupons();
   }, []);
 
   const fetchCoupons = async () => {
@@ -261,6 +272,61 @@ const AdminManageDeals = () => {
     }
   };
 
+  const fetchPopularCoupons = async () => {
+    try {
+      // Get usage counts grouped by coupon_id
+      const { data: usageData, error: usageError } = await supabase
+        .from("coupon_usage")
+        .select("coupon_id");
+
+      if (usageError) throw usageError;
+
+      // Count usage per coupon
+      const usageCounts = new Map<string, number>();
+      usageData?.forEach((usage) => {
+        usageCounts.set(usage.coupon_id, (usageCounts.get(usage.coupon_id) || 0) + 1);
+      });
+
+      // Get top 3 coupon IDs by usage count
+      const sortedCouponIds = Array.from(usageCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([couponId]) => couponId);
+
+      if (sortedCouponIds.length === 0) {
+        setPopularCoupons([]);
+        return;
+      }
+
+      // Fetch coupon details for top 3
+      const { data: couponData, error: couponError } = await supabase
+        .from("coupon_codes")
+        .select("id, code, type, value")
+        .in("id", sortedCouponIds);
+
+      if (couponError) throw couponError;
+
+      // Map to PopularCoupon format maintaining order
+      const popular: PopularCoupon[] = sortedCouponIds
+        .map((couponId) => {
+          const coupon = couponData?.find((c) => c.id === couponId);
+          if (!coupon) return null;
+          return {
+            coupon_id: couponId,
+            code: coupon.code,
+            type: coupon.type,
+            value: coupon.value,
+            usage_count: usageCounts.get(couponId) || 0,
+          };
+        })
+        .filter((c): c is PopularCoupon => c !== null);
+
+      setPopularCoupons(popular);
+    } catch (error: any) {
+      console.error("Error fetching popular coupons:", error);
+    }
+  };
+
   const resetForm = () => {
     form.reset({
       code: "",
@@ -321,6 +387,7 @@ const AdminManageDeals = () => {
       resetForm();
       await fetchCoupons();
       await fetchStatistics();
+      await fetchPopularCoupons();
     } catch (error: any) {
       showErrorToast({
         title: "Error",
@@ -369,6 +436,7 @@ const AdminManageDeals = () => {
       }
       await fetchCoupons();
       await fetchStatistics();
+      await fetchPopularCoupons();
     } catch (error: any) {
       showErrorToast({
         title: "Error",
@@ -830,6 +898,68 @@ const AdminManageDeals = () => {
               </CardContent>
             </Card>
           </div>
+
+          {/* Most Popular Coupon Codes Card */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Award className="w-5 h-5 text-primary" />
+                Most Popular Coupon Codes
+              </CardTitle>
+              <CardDescription>
+                Top 3 most used coupon codes
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {popularCoupons.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    No coupon usage data available yet
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {popularCoupons.map((coupon, index) => (
+                    <div
+                      key={coupon.coupon_id}
+                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary font-bold">
+                          {index + 1}
+                        </div>
+                        <div>
+                          <div className="font-mono font-semibold text-lg">
+                            {coupon.code}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <Badge variant={coupon.type === "percentage" ? "default" : "secondary"}>
+                              {coupon.type === "percentage" ? (
+                                <Percent className="w-3 h-3 mr-1" />
+                              ) : (
+                                <PoundSterling className="w-3 h-3 mr-1" />
+                              )}
+                              {coupon.type === "percentage" 
+                                ? `${coupon.value}% off`
+                                : `£${coupon.value.toFixed(2)} off`}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-primary">
+                          {coupon.usage_count}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {coupon.usage_count === 1 ? "use" : "uses"}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Usage History Tab */}
