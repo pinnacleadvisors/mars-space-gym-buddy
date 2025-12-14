@@ -522,6 +522,15 @@ export type Database = {
         Returns: Json
       }
       get_coupon_usage_count: { Args: { _coupon_id: string }; Returns: number }
+      get_session_capacities: {
+        Args: { session_ids: string[] }
+        Returns: {
+          available: number
+          booked: number
+          capacity: number
+          session_id: string
+        }[]
+      }
       get_user_emails: {
         Args: never
         Returns: {
