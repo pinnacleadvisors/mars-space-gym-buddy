@@ -26,6 +26,8 @@ export function TopBar() {
             src={`${import.meta.env.BASE_URL}earth-space-logo-9.webp`}
             alt="Earth Space" 
             className="h-8 md:h-10 w-auto cursor-pointer hover:opacity-80 transition-opacity"
+            loading="eager"
+            decoding="async"
             onClick={() => navigate("/dashboard")}
           />
         </div>

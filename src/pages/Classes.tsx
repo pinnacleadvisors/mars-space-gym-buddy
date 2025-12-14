@@ -1,15 +1,17 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, CalendarDays, Grid3x3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { showErrorToast } from "@/lib/utils/toastHelpers";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClassCardSkeletons } from "@/components/loading/ClassCardSkeleton";
 import { ClassCalendarView } from "@/components/calendar/ClassCalendarView";
 import { ClassCard } from "@/components/class/ClassCard";
+import { useDebounce } from "@/hooks/useDebounce";
+import { useCategories } from "@/hooks/queries/useCategories";
+import { useQuery } from "@tanstack/react-query";
 
 interface ClassType {
   id: string;
@@ -48,39 +50,22 @@ const CLASSES_PER_PAGE = 12;
 
 const Classes = () => {
   const navigate = useNavigate();
-  const [classes, setClasses] = useState<ClassType[]>([]);
-  const [allSessions, setAllSessions] = useState<ClassSession[]>([]);
-  const [categories, setCategories] = useState<ClassCategory[]>([]);
-  const [loading, setLoading] = useState(true);
+  
+  // React Query hooks
+  const { data: categories = [], isLoading: categoriesLoading } = useCategories();
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [visibleCount, setVisibleCount] = useState(CLASSES_PER_PAGE);
   const [viewMode, setViewMode] = useState<"grid" | "calendar">("grid");
   const [calendarViewMode, setCalendarViewMode] = useState<"daily" | "weekly" | "monthly">("weekly");
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const now = new Date().toISOString();
-      
-      // Fetch categories
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from("class_categories" as any)
-        .select("*")
-        .eq("is_active", true)
-        .order("display_order", { ascending: true })
-        .order("name", { ascending: true });
-
-      if (categoriesError) throw categoriesError;
-      setCategories((categoriesData || []) as unknown as ClassCategory[]);
-      
-      // Fetch all active classes with category info
-      const { data: classesData, error: classesError } = await supabase
+  // Fetch active classes with category info
+  const { data: classes = [], isLoading: classesLoading } = useQuery({
+    queryKey: ["classes", "active"],
+    queryFn: async () => {
+      const { data, error } = await supabase
         .from("classes")
         .select(`
           id,
@@ -98,27 +83,30 @@ const Classes = () => {
         .eq("is_active", true)
         .order("name", { ascending: true });
 
-      if (classesError) throw classesError;
-      setClasses((classesData || []) as ClassType[]);
+      if (error) throw error;
+      return (data || []) as ClassType[];
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 
-      // Fetch all upcoming sessions for calendar view
-      const { data: sessionsData, error: sessionsError } = await supabase
+  // Fetch upcoming sessions for calendar view
+  const { data: allSessions = [] } = useQuery({
+    queryKey: ["sessions", "upcoming"],
+    queryFn: async () => {
+      const now = new Date().toISOString();
+      const { data, error } = await supabase
         .from("class_sessions")
         .select("*")
         .gte("start_time", now)
         .order("start_time", { ascending: true });
 
-      if (sessionsError) throw sessionsError;
-      setAllSessions((sessionsData || []) as ClassSession[]);
-    } catch (error: any) {
-      showErrorToast({
-        title: "Error",
-        description: error.message || "Failed to fetch classes",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+      if (error) throw error;
+      return (data || []) as ClassSession[];
+    },
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+
+  const loading = classesLoading || categoriesLoading;
 
   // Filter classes based on search and category
   const filteredClasses = useMemo(() => {
@@ -133,8 +121,8 @@ const Classes = () => {
     }
 
     // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+    if (debouncedSearchQuery) {
+      const query = debouncedSearchQuery.toLowerCase();
       filtered = filtered.filter(
         (classItem) =>
           classItem.name.toLowerCase().includes(query) ||
@@ -144,7 +132,7 @@ const Classes = () => {
     }
 
     return filtered;
-  }, [classes, selectedCategory, searchQuery]);
+  }, [classes, selectedCategory, debouncedSearchQuery]);
 
   // Paginated classes
   const visibleClasses = useMemo(() => {

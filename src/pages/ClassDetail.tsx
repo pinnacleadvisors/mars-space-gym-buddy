@@ -277,6 +277,8 @@ const ClassDetail = () => {
                 src={displayImage}
                 alt={classData.name}
                 className="w-full h-full object-cover"
+                loading="lazy"
+                decoding="async"
               />
               {categoryName && (
                 <div className="absolute top-4 left-4">

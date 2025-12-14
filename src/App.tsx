@@ -1,41 +1,64 @@
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { AdminRoute } from "./components/auth/AdminRoute";
 import { ErrorBoundary } from "./components/error/ErrorBoundary";
 import { getBasePath } from "./lib/utils/pathUtils";
+import { RouteSuspense } from "./components/loading/RouteSuspense";
+import { PageSkeleton } from "./components/loading/PageSkeleton";
+
+// Public routes - keep as regular imports for faster initial load
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
-import Dashboard from "./pages/Dashboard";
-import Classes from "./pages/Classes";
-import ClassDetail from "./pages/ClassDetail";
-import Bookings from "./pages/Bookings";
-import EntryExit from "./pages/EntryExit";
-import AdminDashboard from "./pages/AdminDashboard";
-import AdminUsers from "./pages/AdminUsers";
-import AdminAnalytics from "./pages/AdminAnalytics";
-import AdminManageClasses from "./pages/AdminManageClasses";
-import AdminManageMemberships from "./pages/AdminManageMemberships";
-import AdminUserMemberships from "./pages/AdminUserMemberships";
-import AdminManageDeals from "./pages/AdminManageDeals";
-import ManageMemberships from "./pages/ManageMemberships";
-import Profile from "./pages/Profile";
-import Rewards from "./pages/Rewards";
-import Settings from "./pages/Settings";
-import AdminRewardClaim from "./pages/AdminRewardClaim";
-import EmailVerificationRequired from "./pages/EmailVerificationRequired";
 import AuthCallback from "./pages/AuthCallback";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+// Protected routes - lazy load for code splitting
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Classes = lazy(() => import("./pages/Classes"));
+const ClassDetail = lazy(() => import("./pages/ClassDetail"));
+const Bookings = lazy(() => import("./pages/Bookings"));
+const EntryExit = lazy(() => import("./pages/EntryExit"));
+const ManageMemberships = lazy(() => import("./pages/ManageMemberships"));
+const Profile = lazy(() => import("./pages/Profile"));
+const Rewards = lazy(() => import("./pages/Rewards"));
+const Settings = lazy(() => import("./pages/Settings"));
+const EmailVerificationRequired = lazy(() => import("./pages/EmailVerificationRequired"));
+
+// Admin routes - lazy load for code splitting
+const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
+const AdminUsers = lazy(() => import("./pages/AdminUsers"));
+const AdminAnalytics = lazy(() => import("./pages/AdminAnalytics"));
+const AdminManageClasses = lazy(() => import("./pages/AdminManageClasses"));
+const AdminManageMemberships = lazy(() => import("./pages/AdminManageMemberships"));
+const AdminUserMemberships = lazy(() => import("./pages/AdminUserMemberships"));
+const AdminManageDeals = lazy(() => import("./pages/AdminManageDeals"));
+const AdminRewardClaim = lazy(() => import("./pages/AdminRewardClaim"));
+
+// Configure React Query client with optimal settings
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+      retry: 1,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+    },
+    mutations: {
+      retry: 1,
+    },
+  },
+});
 
 /**
  * Handles GitHub Pages SPA redirect
@@ -78,7 +101,7 @@ const App = () => {
           <GitHubPagesRedirectHandler />
           <AppLayout>
             <Routes>
-            {/* Public Routes */}
+            {/* Public Routes - No lazy loading for faster initial load */}
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
@@ -91,7 +114,9 @@ const App = () => {
               path="/verify-email"
               element={
                 <ProtectedRoute requireEmailVerification={false}>
-                  <EmailVerificationRequired />
+                  <RouteSuspense>
+                    <EmailVerificationRequired />
+                  </RouteSuspense>
                 </ProtectedRoute>
               }
             />
@@ -101,7 +126,9 @@ const App = () => {
               path="/dashboard"
               element={
                 <ProtectedRoute>
-                  <Dashboard />
+                  <RouteSuspense>
+                    <Dashboard />
+                  </RouteSuspense>
                 </ProtectedRoute>
               }
             />
@@ -109,7 +136,9 @@ const App = () => {
               path="/classes"
               element={
                 <ProtectedRoute>
-                  <Classes />
+                  <RouteSuspense>
+                    <Classes />
+                  </RouteSuspense>
                 </ProtectedRoute>
               }
             />
@@ -117,7 +146,9 @@ const App = () => {
               path="/classes/:classId"
               element={
                 <ProtectedRoute>
-                  <ClassDetail />
+                  <RouteSuspense>
+                    <ClassDetail />
+                  </RouteSuspense>
                 </ProtectedRoute>
               }
             />
@@ -125,7 +156,9 @@ const App = () => {
               path="/bookings"
               element={
                 <ProtectedRoute>
-                  <Bookings />
+                  <RouteSuspense>
+                    <Bookings />
+                  </RouteSuspense>
                 </ProtectedRoute>
               }
             />
@@ -133,7 +166,9 @@ const App = () => {
               path="/managememberships"
               element={
                 <ProtectedRoute>
-                  <ManageMemberships />
+                  <RouteSuspense>
+                    <ManageMemberships />
+                  </RouteSuspense>
                 </ProtectedRoute>
               }
             />
@@ -141,7 +176,9 @@ const App = () => {
               path="/profile"
               element={
                 <ProtectedRoute>
-                  <Profile />
+                  <RouteSuspense>
+                    <Profile />
+                  </RouteSuspense>
                 </ProtectedRoute>
               }
             />
@@ -149,7 +186,9 @@ const App = () => {
               path="/qr/entry-exit"
               element={
                 <ProtectedRoute>
-                  <EntryExit />
+                  <RouteSuspense>
+                    <EntryExit />
+                  </RouteSuspense>
                 </ProtectedRoute>
               }
             />
@@ -157,7 +196,9 @@ const App = () => {
               path="/rewards"
               element={
                 <ProtectedRoute>
-                  <Rewards />
+                  <RouteSuspense>
+                    <Rewards />
+                  </RouteSuspense>
                 </ProtectedRoute>
               }
             />
@@ -165,7 +206,9 @@ const App = () => {
               path="/settings"
               element={
                 <ProtectedRoute>
-                  <Settings />
+                  <RouteSuspense>
+                    <Settings />
+                  </RouteSuspense>
                 </ProtectedRoute>
               }
             />
@@ -175,7 +218,9 @@ const App = () => {
               path="/admin"
               element={
                 <AdminRoute>
-                  <AdminDashboard />
+                  <RouteSuspense>
+                    <AdminDashboard />
+                  </RouteSuspense>
                 </AdminRoute>
               }
             />
@@ -183,7 +228,9 @@ const App = () => {
               path="/admin/users"
               element={
                 <AdminRoute>
-                  <AdminUsers />
+                  <RouteSuspense>
+                    <AdminUsers />
+                  </RouteSuspense>
                 </AdminRoute>
               }
             />
@@ -191,7 +238,9 @@ const App = () => {
               path="/admin/analytics"
               element={
                 <AdminRoute>
-                  <AdminAnalytics />
+                  <RouteSuspense>
+                    <AdminAnalytics />
+                  </RouteSuspense>
                 </AdminRoute>
               }
             />
@@ -199,7 +248,9 @@ const App = () => {
               path="/admin/manageclasses"
               element={
                 <AdminRoute>
-                  <AdminManageClasses />
+                  <RouteSuspense>
+                    <AdminManageClasses />
+                  </RouteSuspense>
                 </AdminRoute>
               }
             />
@@ -207,7 +258,9 @@ const App = () => {
               path="/admin/memberships"
               element={
                 <AdminRoute>
-                  <AdminManageMemberships />
+                  <RouteSuspense>
+                    <AdminManageMemberships />
+                  </RouteSuspense>
                 </AdminRoute>
               }
             />
@@ -215,7 +268,9 @@ const App = () => {
               path="/admin/usermemberships"
               element={
                 <AdminRoute>
-                  <AdminUserMemberships />
+                  <RouteSuspense>
+                    <AdminUserMemberships />
+                  </RouteSuspense>
                 </AdminRoute>
               }
             />
@@ -223,7 +278,9 @@ const App = () => {
               path="/admin/reward-claim"
               element={
                 <AdminRoute>
-                  <AdminRewardClaim />
+                  <RouteSuspense>
+                    <AdminRewardClaim />
+                  </RouteSuspense>
                 </AdminRoute>
               }
             />
@@ -231,7 +288,9 @@ const App = () => {
               path="/admin/managedeals"
               element={
                 <AdminRoute>
-                  <AdminManageDeals />
+                  <RouteSuspense>
+                    <AdminManageDeals />
+                  </RouteSuspense>
                 </AdminRoute>
               }
             />
@@ -241,6 +300,7 @@ const App = () => {
           </Routes>
         </AppLayout>
       </BrowserRouter>
+      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
     </TooltipProvider>
   </QueryClientProvider>
   </ErrorBoundary>

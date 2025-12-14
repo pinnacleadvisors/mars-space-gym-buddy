@@ -109,6 +109,8 @@ export const QRCodeDisplay = ({
                   src={qrCodeUrl}
                   alt={`QR Code for ${action}`}
                   className="w-full h-auto"
+                  loading="lazy"
+                  decoding="async"
                   style={{ maxWidth: size, maxHeight: size }}
                 />
               </div>

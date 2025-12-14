@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
+import { useDebounce } from "@/hooks/useDebounce";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,6 +12,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useClasses, useCreateClass, useUpdateClass, useDeleteClass, type Class } from "@/hooks/queries/useClasses";
+import { useSessions, useSessionCapacities, useCreateSessions, useUpdateSession, useDeleteSession, useUpdateSessionCapacity, type ClassSession, type SessionCapacity } from "@/hooks/queries/useSessions";
+import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory, type ClassCategory } from "@/hooks/queries/useCategories";
+import { useInstructors, type Instructor } from "@/hooks/queries/useInstructors";
 import { 
   Plus, 
   Pencil, 
@@ -81,67 +86,32 @@ const sessionSchema = z.object({
 type ClassFormData = z.infer<typeof classSchema>;
 type SessionFormData = z.infer<typeof sessionSchema>;
 
-interface Class {
-  id: string;
-  name: string;
-  description: string | null;
-  instructor: string;
-  schedule: string;
-  duration: number;
-  capacity: number;
-  category: string | null;
-  category_id: string | null;
-  image_url: string | null;
-  is_active: boolean;
-  created_at?: string;
-}
-
-interface ClassSession {
-  id: string;
-  class_id: string | null;
-  name: string;
-  instructor: string | null;
-  start_time: string;
-  end_time: string;
-  capacity: number | null;
-  created_at: string;
-  classes?: {
-    name: string;
-  };
-}
-
-interface SessionCapacity {
-  session_id: string;
-  capacity: number;
-  booked: number;
-  available: number;
-}
-
-interface Instructor {
-  name: string;
-  class_count: number;
-  session_count: number;
-}
-
-interface ClassCategory {
-  id: string;
-  name: string;
-  description: string | null;
-  image_url: string | null;
-  is_active: boolean;
-  display_order: number;
-  created_at: string;
-  updated_at: string;
-}
-
 const AdminManageClasses = () => {
   const { toast } = useToast();
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [sessions, setSessions] = useState<ClassSession[]>([]);
-  const [sessionCapacities, setSessionCapacities] = useState<Map<string, SessionCapacity>>(new Map());
-  const [instructors, setInstructors] = useState<Instructor[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sessionsLoading, setSessionsLoading] = useState(false);
+  
+  // React Query hooks for data fetching
+  const { data: classes = [], isLoading: loading } = useClasses();
+  const { data: sessions = [], isLoading: sessionsLoading } = useSessions(100);
+  const { data: instructors = [] } = useInstructors();
+  const { data: classCategories = [], isLoading: categoriesLoading } = useCategories();
+  
+  // Get session IDs for capacity query
+  const sessionIds = useMemo(() => sessions.map(s => s.id), [sessions]);
+  const { data: sessionCapacitiesMap = new Map<string, SessionCapacity>() } = useSessionCapacities(sessionIds);
+  
+  // Mutations
+  const createClassMutation = useCreateClass();
+  const updateClassMutation = useUpdateClass();
+  const deleteClassMutation = useDeleteClass();
+  const createSessionsMutation = useCreateSessions();
+  const updateSessionMutation = useUpdateSession();
+  const deleteSessionMutation = useDeleteSession();
+  const updateSessionCapacityMutation = useUpdateSessionCapacity();
+  const createCategoryMutation = useCreateCategory();
+  const updateCategoryMutation = useUpdateCategory();
+  const deleteCategoryMutation = useDeleteCategory();
+  
+  // UI state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [sessionDialogOpen, setSessionDialogOpen] = useState(false);
   const [sessionEditDialogOpen, setSessionEditDialogOpen] = useState(false);
@@ -152,14 +122,13 @@ const AdminManageClasses = () => {
   const [editingSession, setEditingSession] = useState<ClassSession | null>(null);
   const [selectedClassForSession, setSelectedClassForSession] = useState<Class | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [instructorFilter, setInstructorFilter] = useState<string>("all");
   const [sessionInstructorFilter, setSessionInstructorFilter] = useState<string>("all");
   const [sessionClassFilter, setSessionClassFilter] = useState<string>("all");
   const [sessionCategoryFilter, setSessionCategoryFilter] = useState<string>("all");
   const [activeTab, setActiveTab] = useState<"classes" | "sessions" | "instructors" | "calendar" | "categories">("classes");
-  const [classCategories, setClassCategories] = useState<ClassCategory[]>([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ClassCategory | null>(null);
   const [categoryImageFile, setCategoryImageFile] = useState<File | null>(null);
@@ -208,143 +177,7 @@ const AdminManageClasses = () => {
     },
   });
 
-  useEffect(() => {
-    fetchClasses();
-    fetchSessions();
-    fetchInstructors();
-    fetchCategories();
-  }, []);
-
-  const fetchClasses = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("classes")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-      setClasses(data || []);
-    } catch (error: any) {
-      showErrorToast({
-        title: "Error loading classes",
-        description: error.message,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchSessions = async () => {
-    try {
-      setSessionsLoading(true);
-      const { data, error } = await supabase
-        .from("class_sessions")
-        .select("*, classes(name, category)")
-        .order("start_time", { ascending: false })
-        .limit(100); // Limit to recent 100 sessions
-
-      if (error) throw error;
-      setSessions(data || []);
-
-      // Fetch booking counts for each session
-      if (data && data.length > 0) {
-        const sessionIds = data.map((s) => s.id);
-        const { data: bookings, error: bookingsError } = await supabase
-          .from("class_bookings")
-          .select("class_id, status")
-          .in("class_id", sessionIds)
-          .neq("status", "cancelled");
-
-        if (!bookingsError && bookings) {
-          const capacityMap = new Map<string, SessionCapacity>();
-          data.forEach((session) => {
-            const booked = bookings.filter((b) => b.class_id === session.id).length;
-            const capacity = session.capacity || 0;
-            capacityMap.set(session.id, {
-              session_id: session.id,
-              capacity,
-              booked,
-              available: Math.max(0, capacity - booked),
-            });
-          });
-          setSessionCapacities(capacityMap);
-        }
-      }
-    } catch (error: any) {
-      showErrorToast({
-        title: "Error loading sessions",
-        description: error.message,
-      });
-    } finally {
-      setSessionsLoading(false);
-    }
-  };
-
-  const fetchInstructors = async () => {
-    try {
-      // Get unique instructors from classes
-      const { data: classesData, error: classesError } = await supabase
-        .from("classes")
-        .select("instructor");
-
-      if (classesError) throw classesError;
-
-      // Get unique instructors from sessions
-      const { data: sessionsData, error: sessionsError } = await supabase
-        .from("class_sessions")
-        .select("instructor");
-
-      if (sessionsError) throw sessionsError;
-
-      // Combine and count
-      const instructorMap = new Map<string, { class_count: number; session_count: number }>();
-      
-      classesData?.forEach((c) => {
-        if (c.instructor) {
-          const existing = instructorMap.get(c.instructor) || { class_count: 0, session_count: 0 };
-          instructorMap.set(c.instructor, { ...existing, class_count: existing.class_count + 1 });
-        }
-      });
-
-      sessionsData?.forEach((s) => {
-        if (s.instructor) {
-          const existing = instructorMap.get(s.instructor) || { class_count: 0, session_count: 0 };
-          instructorMap.set(s.instructor, { ...existing, session_count: existing.session_count + 1 });
-        }
-      });
-
-      const instructorList: Instructor[] = Array.from(instructorMap.entries()).map(([name, counts]) => ({
-        name,
-        ...counts,
-      }));
-
-      setInstructors(instructorList.sort((a, b) => a.name.localeCompare(b.name)));
-    } catch (error: any) {
-      console.error("Error fetching instructors:", error);
-    }
-  };
-
-  const fetchCategories = async () => {
-    try {
-      setCategoriesLoading(true);
-      const { data, error } = await supabase
-        .from("class_categories" as any)
-        .select("*")
-        .order("display_order", { ascending: true })
-        .order("name", { ascending: true });
-
-      if (error) throw error;
-      setClassCategories((data || []) as unknown as ClassCategory[]);
-    } catch (error: any) {
-      showErrorToast({
-        title: "Error loading categories",
-        description: error.message,
-      });
-    } finally {
-      setCategoriesLoading(false);
-    }
-  };
+  // Session capacities are now fetched via RPC function in useSessionCapacities hook
 
   const handleCategoryImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -395,46 +228,31 @@ const AdminManageClasses = () => {
           await deleteImage(editingCategory.image_url, "category-images");
         }
 
-        const { error } = await supabase
-          .from("class_categories" as any)
-          .update({
-            ...data,
-            image_url: imageUrl || null,
-          })
-          .eq("id", editingCategory.id);
-
-        if (error) throw error;
-        showSuccessToast("Category updated successfully");
+        await updateCategoryMutation.mutateAsync({
+          id: editingCategory.id,
+          ...data,
+          image_url: imageUrl || null,
+        });
       } else {
         // Create new category first (without image if we have a file to upload)
-        const { data: newCategory, error } = await supabase
-          .from("class_categories" as any)
-          .insert([{
-            ...data,
-            image_url: categoryImageFile ? null : (imageUrl || null), // Only set image_url if no file to upload
-          }])
-          .select()
-          .single();
-
-        if (error) throw error;
+        const newCategory = await createCategoryMutation.mutateAsync({
+          ...data,
+          image_url: categoryImageFile ? null : (imageUrl || null), // Only set image_url if no file to upload
+        });
 
         // If we have an image file, upload it with the real category ID and update
-        if (categoryImageFile && newCategory && (newCategory as any).id) {
+        if (categoryImageFile && newCategory && newCategory.id) {
           setUploadingCategoryImage(true);
           try {
-            const realImageUrl = await uploadCategoryImage(categoryImageFile, (newCategory as any).id);
-            const { error: updateError } = await supabase
-              .from("class_categories" as any)
-              .update({ image_url: realImageUrl })
-              .eq("id", (newCategory as any).id);
-            
-            if (updateError) throw updateError;
+            const realImageUrl = await uploadCategoryImage(categoryImageFile, newCategory.id);
+            await updateCategoryMutation.mutateAsync({
+              id: newCategory.id,
+              image_url: realImageUrl,
+            });
           } finally {
             setUploadingCategoryImage(false);
           }
         }
-
-        showSuccessToast("Category created successfully");
       }
 
       setCategoryDialogOpen(false);
@@ -442,13 +260,8 @@ const AdminManageClasses = () => {
       setEditingCategory(null);
       setCategoryImageFile(null);
       setCategoryImagePreview(null);
-      await fetchCategories();
-      await fetchClasses(); // Refresh classes to get updated category data
     } catch (error: any) {
-      showErrorToast({
-        title: "Error",
-        description: error.message,
-      });
+      // Error handling is done in mutation hooks
     } finally {
       setUploadingCategoryImage(false);
     }
@@ -487,19 +300,9 @@ const AdminManageClasses = () => {
         await deleteImage(category.image_url, "category-images");
       }
 
-      const { error } = await supabase
-        .from("class_categories" as any)
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-      showSuccessToast("Category deleted successfully");
-      await fetchCategories();
+      await deleteCategoryMutation.mutateAsync(id);
     } catch (error: any) {
-      showErrorToast({
-        title: "Error",
-        description: error.message,
-      });
+      // Error handling is done in mutation hook
     }
   };
 
@@ -520,17 +323,17 @@ const AdminManageClasses = () => {
   const filteredClasses = useMemo(() => {
     return classes.filter((classItem) => {
       const matchesSearch =
-        searchQuery === "" ||
-        classItem.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        classItem.instructor.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        classItem.category?.toLowerCase().includes(searchQuery.toLowerCase());
+        debouncedSearchQuery === "" ||
+        classItem.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        classItem.instructor.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
+        classItem.category?.toLowerCase().includes(debouncedSearchQuery.toLowerCase());
 
       const matchesCategory = categoryFilter === "all" || classItem.category === categoryFilter;
       const matchesInstructor = instructorFilter === "all" || classItem.instructor === instructorFilter;
 
       return matchesSearch && matchesCategory && matchesInstructor;
     });
-  }, [classes, searchQuery, categoryFilter, instructorFilter]);
+  }, [classes, debouncedSearchQuery, categoryFilter, instructorFilter]);
 
   const categoryNames = useMemo(() => {
     const cats = new Set<string>();
@@ -590,39 +393,26 @@ const AdminManageClasses = () => {
           await deleteImage(editingClass.image_url, "class-images");
         }
 
-        const { error } = await supabase
-          .from("classes")
-          .update({
-            ...data,
-            image_url: imageUrl || null,
-          } as any)
-          .eq("id", editingClass.id);
-
-        if (error) throw error;
-        showSuccessToast("Class updated successfully");
+        await updateClassMutation.mutateAsync({
+          id: editingClass.id,
+          ...data,
+          image_url: imageUrl || null,
+        });
       } else {
         // Create new class
-        const { data: newClass, error } = await supabase
-          .from("classes")
-          .insert([{
-            ...data,
-            image_url: imageUrl || null,
-          } as any])
-          .select()
-          .single();
-
-        if (error) throw error;
+        const newClass = await createClassMutation.mutateAsync({
+          ...data,
+          image_url: imageUrl || null,
+        });
 
         // If we uploaded with temp ID, re-upload with real ID
-        if (classImageFile && newClass && (newClass as any).id) {
-          const realImageUrl = await uploadClassImage(classImageFile, (newClass as any).id);
-          await supabase
-            .from("classes")
-            .update({ image_url: realImageUrl })
-            .eq("id", (newClass as any).id);
+        if (classImageFile && newClass && newClass.id) {
+          const realImageUrl = await uploadClassImage(classImageFile, newClass.id);
+          await updateClassMutation.mutateAsync({
+            id: newClass.id,
+            image_url: realImageUrl,
+          });
         }
-
-        showSuccessToast("Class created successfully");
       }
 
       setDialogOpen(false);
@@ -630,13 +420,8 @@ const AdminManageClasses = () => {
       setEditingClass(null);
       setClassImageFile(null);
       setClassImagePreview(null);
-      await fetchClasses();
-      await fetchInstructors();
     } catch (error: any) {
-      showErrorToast({
-        title: "Error",
-        description: error.message,
-      });
+      // Error handling is done in mutation hooks
     } finally {
       setUploadingClassImage(false);
     }
@@ -646,17 +431,9 @@ const AdminManageClasses = () => {
     if (!confirm("Are you sure you want to delete this class? This will not delete associated sessions.")) return;
 
     try {
-      const { error } = await supabase.from("classes").delete().eq("id", id);
-
-      if (error) throw error;
-      showSuccessToast("Class deleted successfully");
-      await fetchClasses();
-      await fetchInstructors();
+      await deleteClassMutation.mutateAsync(id);
     } catch (error: any) {
-      showErrorToast({
-        title: "Error",
-        description: error.message,
-      });
+      // Error handling is done in mutation hook
     }
   };
 
@@ -780,100 +557,49 @@ const AdminManageClasses = () => {
         });
       }
 
-      const { error } = await supabase.from("class_sessions").insert(sessionsToCreate);
+      await createSessionsMutation.mutateAsync(sessionsToCreate);
 
-      if (error) throw error;
-
-      showSuccessToast(`Created ${sessionsToCreate.length} session(s) successfully`);
       setSessionDialogOpen(false);
       setSelectedClassForSession(null);
       sessionForm.reset();
-      await fetchSessions();
-      await fetchInstructors();
     } catch (error: any) {
-      showErrorToast({
-        title: "Error",
-        description: error.message || "Failed to create session(s)",
-      });
+      // Error handling is done in mutation hook
     }
   };
 
   const handleUpdateSessionCapacity = async (sessionId: string, newCapacity: number) => {
     try {
-      const { error } = await supabase
-        .from("class_sessions")
-        .update({ capacity: newCapacity })
-        .eq("id", sessionId);
-
-      if (error) throw error;
-
-      showSuccessToast("Session capacity updated successfully");
+      await updateSessionCapacityMutation.mutateAsync({ id: sessionId, capacity: newCapacity });
       setCapacityDialogOpen(false);
       setEditingSession(null);
-      await fetchSessions();
     } catch (error: any) {
-      showErrorToast({
-        title: "Error",
-        description: error.message,
-      });
+      // Error handling is done in mutation hook
     }
   };
 
   const handleAddSessionFromCalendar = async (sessionData: Omit<ClassSession, "id" | "created_at">) => {
     try {
-      const { error } = await supabase
-        .from("class_sessions")
-        .insert([sessionData]);
-
-      if (error) throw error;
-
-      showSuccessToast("Session created successfully");
-      await fetchSessions();
+      await createSessionsMutation.mutateAsync([sessionData]);
     } catch (error: any) {
-      showErrorToast({
-        title: "Error",
-        description: error.message || "Failed to create session",
-      });
+      // Error handling is done in mutation hook
       throw error;
     }
   };
 
   const handleEditSessionFromCalendar = async (sessionId: string, sessionData: Partial<ClassSession>) => {
     try {
-      const { error } = await supabase
-        .from("class_sessions")
-        .update(sessionData)
-        .eq("id", sessionId);
-
-      if (error) throw error;
-
-      showSuccessToast("Session updated successfully");
-      await fetchSessions();
+      await updateSessionMutation.mutateAsync({ id: sessionId, ...sessionData });
     } catch (error: any) {
-      showErrorToast({
-        title: "Error",
-        description: error.message || "Failed to update session",
-      });
+      // Error handling is done in mutation hook
       throw error;
     }
   };
 
   const handleDeleteSessionFromCalendar = async (sessionId: string) => {
     try {
-      const { error } = await supabase
-        .from("class_sessions")
-        .delete()
-        .eq("id", sessionId);
-
-      if (error) throw error;
-
-      showSuccessToast("Session deleted successfully");
-      await fetchSessions();
+      await deleteSessionMutation.mutateAsync(sessionId);
     } catch (error: any) {
-      showErrorToast({
-        title: "Error",
-        description: error.message || "Failed to delete session",
-      });
+      // Error handling is done in mutation hook
       throw error;
     }
   };
@@ -1096,6 +822,7 @@ const AdminManageClasses = () => {
                           src={classImagePreview}
                           alt="Preview"
                           className="w-20 h-20 object-cover rounded-md border"
+                          decoding="async"
                         />
                         <Button
                           type="button"
@@ -1270,6 +997,8 @@ const AdminManageClasses = () => {
                             src={classItem.image_url}
                             alt={classItem.name}
                             className="w-full h-full object-cover"
+                            loading="lazy"
+                            decoding="async"
                           />
                         </div>
                       )}
@@ -1448,7 +1177,7 @@ const AdminManageClasses = () => {
                     </TableHeader>
                     <TableBody>
                       {filteredSessions.map((session) => {
-                        const capacity = sessionCapacities.get(session.id);
+                        const capacity = sessionCapacitiesMap.get(session.id);
                         return (
                           <TableRow key={session.id}>
                             <TableCell className="font-medium">{session.name}</TableCell>
@@ -1752,6 +1481,7 @@ const AdminManageClasses = () => {
                               src={categoryImagePreview}
                               alt="Preview"
                               className="w-20 h-20 object-cover rounded-md border"
+                              decoding="async"
                             />
                             <Button
                               type="button"
@@ -1852,6 +1582,8 @@ const AdminManageClasses = () => {
                               src={category.image_url}
                               alt={category.name}
                               className="w-full h-full object-cover"
+                              loading="lazy"
+                              decoding="async"
                             />
                           </div>
                         )}
@@ -2265,17 +1997,17 @@ const AdminManageClasses = () => {
                   }}
                 />
               </div>
-              {sessionCapacities.has(editingSession.id) && (
+              {sessionCapacitiesMap.has(editingSession.id) && (
                 <div className="p-4 bg-muted rounded-lg">
                   <p className="text-sm font-medium mb-2">Current Status</p>
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
                       <span>Booked:</span>
-                      <span className="font-medium">{sessionCapacities.get(editingSession.id)?.booked || 0}</span>
+                      <span className="font-medium">{sessionCapacitiesMap.get(editingSession.id)?.booked || 0}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Available:</span>
-                      <span className="font-medium">{sessionCapacities.get(editingSession.id)?.available || 0}</span>
+                      <span className="font-medium">{sessionCapacitiesMap.get(editingSession.id)?.available || 0}</span>
                     </div>
                   </div>
                 </div>

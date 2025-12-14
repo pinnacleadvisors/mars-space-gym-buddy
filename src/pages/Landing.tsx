@@ -23,6 +23,8 @@ const Landing = () => {
             src={`${import.meta.env.BASE_URL}earth-space-logo-9.webp`}
             alt="Earth Space" 
             className="h-16 md:h-20 lg:h-24 w-auto mx-auto"
+            loading="lazy"
+            decoding="async"
           />
           </div>
           
