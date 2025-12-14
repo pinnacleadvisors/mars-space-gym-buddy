@@ -193,7 +193,7 @@ const AdminManageClasses = () => {
       capacity: 20,
       recurring: false,
       recurringType: "weekly",
-      recurringCount: 4,
+      recurringCount: 1,
     },
   });
 
@@ -694,7 +694,7 @@ const AdminManageClasses = () => {
       capacity: classItem.capacity,
       recurring: false,
       recurringType: "weekly",
-      recurringCount: 4,
+      recurringCount: 1,
     });
     setSessionDialogOpen(true);
   };
@@ -1261,53 +1261,79 @@ const AdminManageClasses = () => {
                   </Button>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Instructor</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Duration</TableHead>
-                        <TableHead>Capacity</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredClasses.map((classItem) => (
-                        <TableRow key={classItem.id}>
-                          <TableCell className="font-medium">{classItem.name}</TableCell>
-                          <TableCell>{classItem.instructor}</TableCell>
-                          <TableCell>{classItem.category || "-"}</TableCell>
-                          <TableCell>{classItem.duration} min</TableCell>
-                          <TableCell>{classItem.capacity}</TableCell>
-                          <TableCell>
-                            <Badge variant={classItem.is_active ? "default" : "secondary"}>
-                              {classItem.is_active ? "Active" : "Inactive"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button variant="ghost" size="icon" onClick={() => handleEdit(classItem)}>
-                                <Pencil className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleCreateSession(classItem)}
-                              >
-                                <CalendarIcon className="w-4 h-4" />
-                              </Button>
-                              <Button variant="destructive" size="icon" onClick={() => handleDelete(classItem.id)}>
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredClasses.map((classItem) => (
+                    <Card key={classItem.id} className="overflow-hidden">
+                      {classItem.image_url && (
+                        <div className="h-32 w-full overflow-hidden">
+                          <img
+                            src={classItem.image_url}
+                            alt={classItem.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      )}
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-lg">{classItem.name}</h3>
+                            {classItem.description && (
+                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                {classItem.description}
+                              </p>
+                            )}
+                          </div>
+                          <Badge variant={classItem.is_active ? "default" : "secondary"}>
+                            {classItem.is_active ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+                        <div className="space-y-2 text-sm text-muted-foreground mb-3">
+                          <div className="flex items-center justify-between">
+                            <span>Instructor:</span>
+                            <span className="font-medium text-foreground">{classItem.instructor}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Category:</span>
+                            <span className="font-medium text-foreground">{classItem.category || "-"}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Duration:</span>
+                            <span className="font-medium text-foreground">{classItem.duration} min</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span>Capacity:</span>
+                            <span className="font-medium text-foreground">{classItem.capacity}</span>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEdit(classItem)}
+                            className="flex-1"
+                          >
+                            <Pencil className="w-4 h-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCreateSession(classItem)}
+                            title="Create Session"
+                          >
+                            <CalendarIcon className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDelete(classItem.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               )}
             </CardContent>
@@ -1998,28 +2024,6 @@ const AdminManageClasses = () => {
                             <SelectItem value="monthly">Month</SelectItem>
                           </SelectContent>
                         </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={sessionForm.control}
-                    name="recurringCount"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Number of Sessions *</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            {...field}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                            min="1"
-                            max="52"
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Will create {sessionForm.watch("recurringCount")} session(s) starting from the selected date
-                        </FormDescription>
                         <FormMessage />
                       </FormItem>
                     )}
