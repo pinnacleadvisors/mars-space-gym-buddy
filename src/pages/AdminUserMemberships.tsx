@@ -1,10 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Loader2, Plus, Edit, Trash2 } from "lucide-react";
+import { Loader2, Plus, Edit, Trash2, Search, Download, Filter } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { format, addMonths } from "date-fns";
+import * as XLSX from "xlsx";
 
 interface UserMembership {
   id: string;
@@ -42,6 +43,7 @@ interface UserMembership {
   cancelled_at: string | null;
   profiles?: {
     full_name: string | null;
+    email?: string | null;
   };
   memberships?: {
     name: string;
@@ -68,6 +70,9 @@ const AdminUserMemberships = () => {
   const [editingUserMembership, setEditingUserMembership] = useState<UserMembership | null>(null);
   const { toast } = useToast();
   const [showCancelledOnly, setShowCancelledOnly] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "expired">("all");
+  const [userEmails, setUserEmails] = useState<Record<string, string>>({});
 
   const [formData, setFormData] = useState({
     user_id: "",
@@ -81,7 +86,30 @@ const AdminUserMemberships = () => {
 
   useEffect(() => {
     fetchData();
+    fetchUserEmails();
   }, [showCancelledOnly]);
+
+  const fetchUserEmails = async () => {
+    try {
+      // Fetch user emails via RPC function
+      // Note: This requires the get_user_emails() database function to be created
+      // See supabase/migrations/ADD_GET_USER_EMAILS_FUNCTION.sql
+      const { data, error } = await supabase.rpc('get_user_emails');
+      
+      if (!error && data) {
+        const emailMap: Record<string, string> = {};
+        data.forEach((item: { id: string; email: string }) => {
+          emailMap[item.id] = item.email;
+        });
+        setUserEmails(emailMap);
+      } else {
+        // If function doesn't exist or fails, email column will show "N/A"
+        console.warn('Could not fetch user emails. Run ADD_GET_USER_EMAILS_FUNCTION.sql migration to enable email column.');
+      }
+    } catch (error) {
+      console.error('Error fetching user emails:', error);
+    }
+  };
 
   // Set up real-time subscription for membership updates
   useEffect(() => {
@@ -149,7 +177,35 @@ const AdminUserMemberships = () => {
       if (usersRes.error) throw usersRes.error;
       if (membershipsRes.error) throw membershipsRes.error;
 
-      setUserMemberships(userMembershipsRes.data || []);
+      // Update status based on end_date before setting state
+      const now = new Date();
+      const updatedMemberships: UserMembership[] = [];
+      const membershipsToUpdate: string[] = [];
+
+      for (const um of userMembershipsRes.data || []) {
+        const endDate = new Date(um.end_date);
+        // If end_date is before current date and status is active, mark for update
+        if (endDate < now && um.status === 'active') {
+          updatedMemberships.push({ ...um, status: 'expired' });
+          membershipsToUpdate.push(um.id);
+        } else {
+          updatedMemberships.push(um);
+        }
+      }
+
+      // Batch update expired memberships in the database
+      if (membershipsToUpdate.length > 0) {
+        const { error: updateError } = await supabase
+          .from("user_memberships")
+          .update({ status: 'expired' })
+          .in('id', membershipsToUpdate);
+        
+        if (updateError) {
+          console.error('Error updating expired memberships:', updateError);
+        }
+      }
+
+      setUserMemberships(updatedMemberships);
       setUsers(usersRes.data || []);
       setMemberships(membershipsRes.data || []);
     } catch (error: any) {
@@ -325,6 +381,79 @@ const AdminUserMemberships = () => {
     }
   };
 
+  // Compute status based on end_date
+  const getComputedStatus = (membership: UserMembership): string => {
+    const endDate = new Date(membership.end_date);
+    const now = new Date();
+    if (endDate < now && membership.status === 'active') {
+      return 'expired';
+    }
+    return membership.status;
+  };
+
+  // Filter and search logic
+  const filteredMemberships = useMemo(() => {
+    return userMemberships.filter((um) => {
+      // Status filter
+      const computedStatus = getComputedStatus(um);
+      if (statusFilter !== "all" && computedStatus !== statusFilter) {
+        return false;
+      }
+
+      // Search filter
+      if (searchQuery) {
+        const searchLower = searchQuery.toLowerCase();
+        const userName = um.profiles?.full_name?.toLowerCase() || "";
+        const membershipName = um.memberships?.name?.toLowerCase() || "";
+        const email = userEmails[um.user_id]?.toLowerCase() || "";
+        
+        return (
+          userName.includes(searchLower) ||
+          membershipName.includes(searchLower) ||
+          email.includes(searchLower)
+        );
+      }
+
+      return true;
+    });
+  }, [userMemberships, statusFilter, searchQuery, userEmails]);
+
+  // Export to Excel
+  const handleExportToExcel = () => {
+    const exportData = filteredMemberships.map((um) => {
+      const computedStatus = getComputedStatus(um);
+      return {
+        User: um.profiles?.full_name || "Unknown User",
+        Email: userEmails[um.user_id] || "N/A",
+        Membership: um.memberships?.name || "Unknown",
+        "Start Date": format(new Date(um.start_date), "yyyy-MM-dd"),
+        "End Date": format(new Date(um.end_date), "yyyy-MM-dd"),
+        Status: computedStatus,
+        "Payment Status": um.payment_status,
+        "Payment Method": um.payment_method ? um.payment_method.replace('_', ' ') : "N/A",
+        "Cancelled At": um.cancelled_at ? format(new Date(um.cancelled_at), "yyyy-MM-dd HH:mm") : "N/A",
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "User Memberships");
+    
+    const excelBuffer = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
+    const blob = new Blob([excelBuffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `user-memberships-${format(new Date(), "yyyy-MM-dd")}.xlsx`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+
+    toast({
+      title: "Success",
+      description: "User memberships exported to Excel successfully",
+    });
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -494,15 +623,46 @@ const AdminUserMemberships = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>
-            {showCancelledOnly ? "Cancelled User Memberships" : "Active User Memberships"}
-          </CardTitle>
+          <div className="flex justify-between items-center">
+            <CardTitle>
+              {showCancelledOnly ? "Cancelled User Memberships" : "User Memberships"}
+            </CardTitle>
+            <Button onClick={handleExportToExcel} variant="outline">
+              <Download className="h-4 w-4 mr-2" />
+              Export to Excel
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
+          <div className="flex gap-4 mb-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, email, or membership..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={statusFilter} onValueChange={(value: "all" | "active" | "expired") => setStatusFilter(value)}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="expired">Expired</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>User</TableHead>
+                <TableHead>Email</TableHead>
                 <TableHead>Membership</TableHead>
                 <TableHead>Start Date</TableHead>
                 <TableHead>End Date</TableHead>
@@ -514,30 +674,35 @@ const AdminUserMemberships = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {userMemberships.length === 0 ? (
+              {filteredMemberships.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="text-center text-muted-foreground">
                     {showCancelledOnly ? "No cancelled memberships found" : "No user memberships found"}
                   </TableCell>
                 </TableRow>
               ) : (
-                userMemberships.map((um) => (
+                filteredMemberships.map((um) => {
+                  const computedStatus = getComputedStatus(um);
+                  return (
                   <TableRow 
                     key={um.id}
                   >
                     <TableCell className="font-medium">
                       {um.profiles?.full_name || "Unknown User"}
                     </TableCell>
+                    <TableCell>
+                      {userEmails[um.user_id] || "N/A"}
+                    </TableCell>
                     <TableCell>{um.memberships?.name || "Unknown"}</TableCell>
                     <TableCell>{format(new Date(um.start_date), "MMM dd, yyyy")}</TableCell>
                     <TableCell>{format(new Date(um.end_date), "MMM dd, yyyy")}</TableCell>
                     <TableCell>
                       <span className={`px-2 py-1 rounded text-xs ${
-                        um.status === 'active' ? 'bg-green-100 text-green-800' :
-                        um.status === 'expired' ? 'bg-red-100 text-red-800' :
+                        computedStatus === 'active' ? 'bg-green-100 text-green-800' :
+                        computedStatus === 'expired' ? 'bg-red-100 text-red-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>
-                        {um.status}
+                        {computedStatus}
                       </span>
                     </TableCell>
                     <TableCell>
@@ -591,7 +756,8 @@ const AdminUserMemberships = () => {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))
+                );
+                })
               )}
             </TableBody>
           </Table>
