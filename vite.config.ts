@@ -12,8 +12,13 @@ export default defineConfig(({ mode }) => ({
   },
 
   // Use base path only in production builds for GitHub Pages
-  // In development, use "/" for seamless local preview
-  base: mode === "production" ? "/mars-space-gym-buddy/" : "/",
+  // For Capacitor mobile builds, always use "/" (no base path)
+  // Check if building for Capacitor via environment variable
+  base: process.env.CAPACITOR === 'true' 
+    ? "/" 
+    : mode === "production" 
+      ? "/mars-space-gym-buddy/" 
+      : "/",
 
   plugins: [
     react(),

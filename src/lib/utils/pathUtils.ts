@@ -1,17 +1,43 @@
 /**
+ * Check if we're running in a Capacitor native app
+ */
+const isCapacitorApp = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  // Check for Capacitor platform indicators
+  return (
+    window.Capacitor !== undefined ||
+    (window as any).Capacitor !== undefined ||
+    document.querySelector('meta[name="viewport"][content*="viewport-fit"]') !== null ||
+    // Check for native app user agent patterns
+    /capacitor/i.test(navigator.userAgent) ||
+    // Check if running in file:// protocol (common in Capacitor)
+    window.location.protocol === 'capacitor:' ||
+    window.location.protocol === 'ionic:' ||
+    window.location.protocol === 'file:'
+  );
+};
+
+/**
  * Get the base path for routing (only in production on GitHub Pages)
- * Also checks if we're in a production build by checking import.meta.env.MODE
- * @returns The base path string or empty string for development
+ * Returns empty string for Capacitor native apps and development
+ * @returns The base path string or empty string
  */
 export const getBasePath = (): string => {
+  // Always return empty string for Capacitor native apps
+  if (isCapacitorApp()) {
+    return '';
+  }
+  
   // Check if we're on GitHub Pages
   if (typeof window !== 'undefined' && window.location.hostname === 'pinnacleadvisors.github.io') {
     return '/mars-space-gym-buddy';
   }
+  
   // In development, always return empty string
   if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.includes('localhost'))) {
     return '';
   }
+  
   // For other environments, return empty string (can be extended later)
   return '';
 };

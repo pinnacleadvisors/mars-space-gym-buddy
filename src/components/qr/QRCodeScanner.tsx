@@ -6,6 +6,8 @@ import { decodeQRCodeData, isQRCodeValid, type QRCodeData } from '@/lib/utils/qr
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { Html5Qrcode } from 'html5-qrcode';
+import { Capacitor } from '@capacitor/core';
+import { Camera as CapacitorCamera } from '@capacitor/camera';
 
 interface QRCodeScannerProps {
   onScan: (data: QRCodeData) => void;
@@ -28,8 +30,84 @@ export const QRCodeScanner = ({
   const [error, setError] = useState<string | null>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const scannerId = 'qr-scanner';
+  const isNative = Capacitor.isNativePlatform();
 
-  const startScanning = async () => {
+  // Native camera scanning using Capacitor
+  const startNativeScanning = async () => {
+    try {
+      setError(null);
+      setIsScanning(true);
+
+      // Request camera permissions
+      const permissionStatus = await CapacitorCamera.checkPermissions();
+      if (permissionStatus.camera !== 'granted') {
+        const requestResult = await CapacitorCamera.requestPermissions();
+        if (requestResult.camera !== 'granted') {
+          throw new Error('Camera permission denied');
+        }
+      }
+
+      // Take a photo and scan for QR code
+      const image = await CapacitorCamera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: 'base64',
+        source: 'camera',
+      });
+
+      if (image.base64String) {
+        // Use html5-qrcode to decode the base64 image
+        const html5QrCode = new Html5Qrcode(scannerId);
+        try {
+          const decodedText = await html5QrCode.decodeFromBase64(image.base64String);
+          const qrData = decodeQRCodeData(decodedText);
+          if (qrData && isQRCodeValid(qrData)) {
+            onScan(qrData);
+            setIsScanning(false);
+          } else {
+            setError('Invalid or expired QR code');
+            onError?.('Invalid or expired QR code');
+            setIsScanning(false);
+          }
+        } catch (decodeErr: any) {
+          // Try scanning from file path if base64 fails
+          if (image.path) {
+            try {
+              const decodedText = await html5QrCode.decodeFromImageFile(image.path);
+              const qrData = decodeQRCodeData(decodedText);
+              if (qrData && isQRCodeValid(qrData)) {
+                onScan(qrData);
+                setIsScanning(false);
+              } else {
+                setError('Invalid or expired QR code');
+                onError?.('Invalid or expired QR code');
+                setIsScanning(false);
+              }
+            } catch (fileErr: any) {
+              setError('Could not read QR code from image. Please try again.');
+              onError?.(fileErr.message);
+              setIsScanning(false);
+            }
+          } else {
+            setError('Could not read QR code from image. Please try again.');
+            onError?.(decodeErr.message);
+            setIsScanning(false);
+          }
+        }
+      }
+    } catch (err: any) {
+      let errorMessage = 'Failed to access camera: ' + err.message;
+      if (err.message.includes('permission')) {
+        errorMessage = 'Camera permission denied. Please enable camera access in your device settings.';
+      }
+      setError(errorMessage);
+      onError?.(errorMessage);
+      setIsScanning(false);
+    }
+  };
+
+  // Web camera scanning using html5-qrcode
+  const startWebScanning = async () => {
     try {
       setError(null);
       
@@ -82,6 +160,14 @@ export const QRCodeScanner = ({
     }
   };
 
+  const startScanning = async () => {
+    if (isNative) {
+      await startNativeScanning();
+    } else {
+      await startWebScanning();
+    }
+  };
+
   const stopScanning = async () => {
     if (scannerRef.current && isScanning) {
       try {
@@ -129,7 +215,7 @@ export const QRCodeScanner = ({
           </Alert>
         )}
 
-        {showCamera && (
+        {showCamera && !isNative && (
           <div className="relative aspect-square bg-muted rounded-lg overflow-hidden">
             <div id={scannerId} className="w-full h-full" />
             {!isScanning && (
@@ -140,6 +226,14 @@ export const QRCodeScanner = ({
                 </div>
               </div>
             )}
+          </div>
+        )}
+        {isNative && isScanning && (
+          <div className="relative aspect-square bg-muted rounded-lg overflow-hidden flex items-center justify-center">
+            <div className="text-center">
+              <Camera className="w-12 h-12 mx-auto mb-2 animate-pulse" />
+              <p className="text-sm">Processing image...</p>
+            </div>
           </div>
         )}
 

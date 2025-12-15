@@ -3,8 +3,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
+
+// Lazy load React Query Devtools only in development
+const ReactQueryDevtools = import.meta.env.DEV
+  ? lazy(() => import("@tanstack/react-query-devtools").then((mod) => ({ default: mod.ReactQueryDevtools })))
+  : null;
 import { AppLayout } from "./components/layout/AppLayout";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { AdminRoute } from "./components/auth/AdminRoute";
@@ -300,7 +304,11 @@ const App = () => {
           </Routes>
         </AppLayout>
       </BrowserRouter>
-      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+      {import.meta.env.DEV && ReactQueryDevtools && (
+        <Suspense fallback={null}>
+          <ReactQueryDevtools initialIsOpen={false} />
+        </Suspense>
+      )}
     </TooltipProvider>
   </QueryClientProvider>
   </ErrorBoundary>
